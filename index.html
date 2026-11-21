@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>MATH_LAND</title>
+    <meta
+      name="description"
+      content="Landscape pixel-art gaming console running the live animated 3D MATH_LAND voxel world with 20 interactive mathematics and AI chapters."
+    />
+    <meta name="theme-color" content="#f27668" />
+
+    <!-- Favicons & App Icons -->
+    <link rel="icon" type="image/png" sizes="64x64" href="/assets/aistudio/favicon_e83dfb12.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Open Graph / Social -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="MATH_LAND" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:title" content="MATH_LAND" />
+    <meta
+      property="og:description"
+      content="Landscape pixel-art gaming console running the live animated 3D MATH_LAND voxel world with 20 interactive mathematics and AI chapters."
+    />
+
+    <!-- X / Twitter -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="MATH_LAND" />
+    <meta
+      name="twitter:description"
+      content="Landscape pixel-art gaming console running the live animated 3D MATH_LAND voxel world with 20 interactive mathematics and AI chapters."
+    />
+
+    <!-- Web App -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="MATH_LAND" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <div class="ambient-grid" aria-hidden="true"></div>
+
+      <!-- Compact Top Editorial & Status Header -->
+      <header class="top-bar">
+        <div class="top-brand">
+          <h1>MATH<em>_LAND</em></h1>
+          <span class="dev-badge">MADE BY &ldquo;AARUTO&rdquo; + &ldquo;DIPU-_-&rdquo;</span>
+          <span class="top-sub">3D Voxel Island &middot; 20 Interactive Math &amp; AI Chapters</span>
+        </div>
+
+        <div class="key-guide" aria-label="Keyboard and console controls">
+          <span><kbd>WASD</kbd> MOVE / PAN</span>
+          <span><kbd>Z</kbd> A &middot; ACT</span>
+          <span><kbd>X</kbd> B &middot; CAM</span>
+          <span><kbd>ENTER</kbd> MENU</span>
+        </div>
+
+        <div class="top-actions">
+          <div class="top-metrics" aria-label="Live world metrics">
+            <span id="score-builds">00203 BUILDS</span>
+            <span aria-hidden="true">/</span>
+            <span id="score-mode">MODE: PAN</span>
+            <span aria-hidden="true">/</span>
+            <span id="score-xp">XP 0000</span>
+            <span aria-hidden="true">/</span>
+            <span id="score-mastery">0/20&#9733;</span>
+            <span aria-hidden="true">/</span>
+            <span id="score-chapter">CH 00 &middot; ALGEBRA</span>
+          </div>
+          <button type="button" id="arcade-hop-btn" class="top-cta-btn is-gold" title="Visit AARUTO + DIPU-_- Dev Arcade HQ & World Toys">
+            DEV HQ &amp; TOYS
+          </button>
+          <button type="button" id="open-atlas-left-btn" class="top-cta-btn">OPEN LABS</button>
+          <button type="button" id="expand-side-btn" class="top-cta-btn is-alt">FULLSCREEN</button>
+        </div>
+      </header>
+
+      <!-- Wide Landscape PIXBOY Gaming Console with Large Widescreen Display -->
+      <section class="console-wrap" aria-label="MATH_LAND PIXBOY WIDE handheld gaming console">
+        <div class="console console-landscape">
+          <!-- Left Console Grip: SELECT, D-Pad, POWER -->
+          <div class="console-grip grip-left">
+            <div class="grip-top-slot">
+              <div class="utility-button">
+                <button type="button" id="btn-select" aria-label="Open or cycle Math Labs"></button>
+                <span>SELECT</span>
+              </div>
+            </div>
+
+            <div class="dpad" aria-label="Directional pad">
+              <button type="button" id="dpad-up" class="d-up" aria-label="Move or pan up"></button>
+              <button type="button" id="dpad-left" class="d-left" aria-label="Move or pan left"></button>
+              <div class="d-center"></div>
+              <button type="button" id="dpad-right" class="d-right" aria-label="Move or pan right"></button>
+              <button type="button" id="dpad-down" class="d-down" aria-label="Move or pan down"></button>
+            </div>
+
+            <div class="grip-bottom-slot">
+              <div class="power-wrap">
+                <button
+                  type="button"
+                  id="power-switch"
+                  class="power-switch"
+                  aria-label="Turn console off"
+                  aria-pressed="true"
+                >
+                  <span></span>
+                </button>
+                <span class="grip-label">POWER</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Center Large Widescreen Bezel & Live 3D World Screen -->
+          <div class="screen-bezel">
+            <div class="screen-labels">
+              <span>PIXBOY WIDE &middot; MATH_LAND 3D &middot; BY AARUTO + DIPU-_-</span>
+              <div class="bezel-tools">
+                <button type="button" id="bezel-sky-btn" class="bezel-tool-btn is-sky" title="Cycle Day, Sunset, and Starlight Night lighting">
+                  SKY: DAY
+                </button>
+                <button type="button" id="bezel-tour-btn" class="bezel-tool-btn" aria-pressed="false" title="Start or stop Auto-Pilot guided island tour">
+                  TOUR
+                </button>
+                <button type="button" id="bezel-sfx-btn" class="bezel-tool-btn is-active" aria-pressed="true" title="Toggle retro chiptune sound FX">
+                  SFX: ON
+                </button>
+                <button type="button" id="bezel-toys-btn" class="bezel-tool-btn is-gold" title="Visit AARUTO + DIPU-_- Dev HQ &amp; interactive world toys">
+                  HQ / TOYS
+                </button>
+                <button type="button" id="bezel-labs-btn" class="bezel-tool-btn" title="Open 20 Math Labs">
+                  LABS
+                </button>
+                <button
+                  type="button"
+                  id="expand-screen-btn"
+                  class="bezel-tool-btn"
+                  aria-pressed="false"
+                  title="Expand screen view"
+                >
+                  EXPAND
+                </button>
+              </div>
+            </div>
+
+            <!-- Live Animated 3D Console Screen -->
+            <div id="console-screen" class="screen">
+              <canvas
+                id="world-canvas"
+                aria-label="MATH_LAND live animated 3D voxel world screen"
+              ></canvas>
+
+              <!-- Scoped In-Screen Top Toolbar -->
+              <div id="cam-controls" class="cam-controls" role="toolbar" aria-label="Camera controls">
+                <div class="cam-mode-group" role="group" aria-label="Camera mode">
+                  <button
+                    type="button"
+                    id="cam-pan-btn"
+                    class="cam-mode-btn is-active"
+                    aria-pressed="true"
+                    title="Move camera"
+                  >
+                    <svg class="cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3" />
+                    </svg>
+                    <span>Pan</span>
+                  </button>
+                  <button
+                    type="button"
+                    id="cam-orbit-btn"
+                    class="cam-mode-btn"
+                    aria-pressed="false"
+                    title="Spin and tilt camera"
+                  >
+                    <svg class="cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                      <polyline points="21 3 21 9 15 9" />
+                    </svg>
+                    <span>Orbit</span>
+                  </button>
+                  <button
+                    type="button"
+                    id="cam-walk-btn"
+                    class="cam-mode-btn"
+                    aria-pressed="false"
+                    title="Walk in first person"
+                  >
+                    <svg class="cam-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="4.5" r="2" />
+                      <path d="M8.5 20.5L10.8 14l3.2 2.8.6 3.7" />
+                      <path d="M10.8 14l1-5.2" />
+                      <path d="M7.5 12.4l3.8-3.4 3.4 1 2.3 2.2" />
+                    </svg>
+                    <span>Walk</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  id="recenter-btn"
+                  class="cam-recenter-btn"
+                  aria-label="Recentre camera"
+                  title="Recentre camera"
+                >
+                  <svg class="cam-icon cam-compass-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8" stroke-opacity="0.35" />
+                    <g id="recenter-compass">
+                      <polygon points="12,4.2 14.7,12 9.3,12" fill="#d94e43" />
+                      <polygon points="12,19.8 14.7,12 9.3,12" fill="currentColor" fill-opacity="0.55" />
+                    </g>
+                  </svg>
+                  <span>Home</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="avatar-btn"
+                  class="cam-recenter-btn cam-avatar-btn"
+                  aria-label="Customize character"
+                  title="Customize character"
+                >
+                  <span class="avatar-swatch-dot" id="avatar-swatch-dot" aria-hidden="true"></span>
+                  <span>Hero</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="collapse-screen-btn"
+                  class="cam-recenter-btn cam-collapse-btn"
+                  aria-label="Return to console view"
+                  hidden
+                >
+                  <span>Console</span>
+                </button>
+
+                <div id="online-pill" class="online-pill" title="Players online" hidden>
+                  <span class="live-dot" aria-hidden="true"></span>
+                  <span id="online-count">1</span>
+                </div>
+              </div>
+
+              <!-- World Toast -->
+              <div id="weave-toast" class="weave-toast" role="status" aria-live="polite" hidden></div>
+
+              <!-- Mobile First-Person Walk Joystick -->
+              <div id="walk-joystick" class="walk-joystick" aria-label="Walk movement joystick" hidden>
+                <svg class="walk-joystick-svg" viewBox="-64 -64 128 128" fill="none" aria-hidden="true">
+                  <circle cx="0" cy="0" r="55" stroke="#161b18" stroke-opacity="0.1" stroke-width="1.2" />
+                  <polyline id="walk-joy-up" class="walk-joy-chevron" points="-7,-41 0,-49 7,-41" />
+                  <polyline id="walk-joy-down" class="walk-joy-chevron" points="-7,41 0,49 7,41" />
+                  <polyline id="walk-joy-left" class="walk-joy-chevron" points="-41,-7 -49,0 -41,7" />
+                  <polyline id="walk-joy-right" class="walk-joy-chevron" points="41,-7 49,0 41,7" />
+                  <g id="walk-joystick-knob" transform="translate(0 0)">
+                    <circle cx="0" cy="3" r="22" fill="#0f1c12" fill-opacity="0.22" />
+                    <circle cx="0" cy="0" r="21.5" fill="#ffffff" stroke="#161b18" stroke-opacity="0.18" stroke-width="1.5" />
+                    <circle cx="0" cy="0" r="7.5" fill="#161b18" fill-opacity="0.07" stroke="#161b18" stroke-opacity="0.22" stroke-width="1.4" />
+                  </g>
+                </svg>
+              </div>
+
+              <!-- Walk Exit Hint -->
+              <button
+                type="button"
+                id="walk-esc-hint"
+                class="walk-esc-hint"
+                aria-label="Press Escape to exit first-person view"
+                hidden
+              >
+                <kbd class="walk-esc-key">Esc</kbd><span>exit walk</span>
+              </button>
+
+              <!-- Contextual Interaction Prompt -->
+              <button type="button" id="interact-prompt" class="interact-prompt" hidden>
+                <kbd id="interact-key" class="interact-key">E</kbd><span id="interact-label">Interact</span>
+              </button>
+
+              <!-- Scoped Bottom Explore & Build Dock -->
+              <div class="bottom-dock">
+                <button type="button" id="add-btn" class="dock-pill dock-pill-add">
+                  + Add
+                </button>
+
+                <div id="pick-spot-pill" class="dock-pill dock-pill-pick" hidden>
+                  <span>Click where to add</span>
+                  <button type="button" id="cancel-pick-btn" class="icon-close-btn" aria-label="Cancel spot selection">
+                    &times;
+                  </button>
+                </div>
+
+                <section id="bottom-builder" class="bottom-builder" aria-label="Add creation" hidden>
+                  <div class="builder-bar">
+                    <button type="button" id="move-spot-btn" class="spot-chip-btn">Move spot</button>
+                    <button type="button" id="close-builder-btn" class="icon-close-btn" aria-label="Close">
+                      &times;
+                    </button>
+                  </div>
+
+                  <div class="builder-row">
+                    <label id="drop-zone" class="drop-tile" for="image-input" title="Upload image">
+                      <input id="image-input" type="file" accept="image/*" hidden />
+                      <div id="drop-empty" class="drop-tile-empty">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                          <rect x="3" y="4" width="18" height="16" rx="3" />
+                          <circle cx="8.5" cy="9.5" r="1.5" />
+                          <path d="M21 15l-4.5-4.5L9 18" />
+                        </svg>
+                        <span>Photo</span>
+                      </div>
+                      <div id="drop-preview-wrap" class="drop-preview-wrap" hidden>
+                        <img id="drop-preview-img" alt="Selected subject" />
+                        <button type="button" id="clear-image-btn" class="clear-img-btn" aria-label="Remove image">
+                          &times;
+                        </button>
+                      </div>
+                    </label>
+
+                    <textarea
+                      id="prompt-input"
+                      rows="2"
+                      maxlength="480"
+                      placeholder="Describe what to add…"
+                      aria-label="Describe what to add"
+                    ></textarea>
+                  </div>
+
+                  <p id="form-error" class="form-error" role="alert" hidden></p>
+
+                  <p class="upload-disclaimer">
+                    By using this feature, you confirm that you have rights to any upload and follow our <a href="https://policies.google.com/terms/generative-ai/use-policy" target="_blank" rel="noopener noreferrer">Prohibited Use Policy</a> and <a href="https://aistudio.google.com/docs/terms?e=0" target="_blank" rel="noopener noreferrer">terms</a>.
+                  </p>
+
+                  <button type="button" id="sculpt-btn" class="primary-btn">Build</button>
+                </section>
+
+                <div id="building-pill" class="dock-pill dock-pill-building" role="status" aria-live="polite" hidden>
+                  <span class="pill-spinner" aria-hidden="true"></span>
+                  <span class="building-pill-copy">
+                    <span id="building-pill-label" class="building-pill-title">Approving query…</span>
+                    <span id="building-pill-sub" class="building-pill-sub">Building 3D voxel creation</span>
+                  </span>
+                </div>
+
+                <button type="button" id="ready-goto-btn" class="dock-pill dock-pill-ready" hidden>
+                  <span class="live-dot live-dot-pulse" aria-hidden="true"></span>
+                  <span id="ready-goto-label">Ready · Go to creation</span>
+                </button>
+
+                <button type="button" id="locate-mine-btn" class="dock-pill dock-pill-placed" hidden>
+                  <span class="live-dot" aria-hidden="true"></span>
+                  <span id="locate-mine-label">Locate yours</span>
+                </button>
+              </div>
+
+              <!-- In-Screen Interactive 20-Chapter Math Lab & Asset Sheet Overlay -->
+              <section id="math-lab-overlay" class="math-lab-overlay" aria-label="Interactive Math Chapter Lab" hidden>
+                <header class="ml-header">
+                  <div class="ml-title-wrap">
+                    <span id="ml-badge" class="ml-badge">CH 00</span>
+                    <h2 id="ml-title" class="ml-title">Algebra Overview</h2>
+                  </div>
+                  <div class="ml-tabs" role="tablist">
+                    <button type="button" id="ml-tab-lab" class="ml-tab-btn is-active" role="tab" aria-selected="true">
+                      INTERACTIVE LAB
+                    </button>
+                    <button type="button" id="ml-tab-activity" class="ml-tab-btn" role="tab" aria-selected="false">
+                      ACTIVITY &amp; QUIZ
+                    </button>
+                    <button type="button" id="ml-tab-sheet" class="ml-tab-btn" role="tab" aria-selected="false">
+                      CHAPTER SHEET
+                    </button>
+                  </div>
+                  <div class="ml-header-actions">
+                    <button type="button" id="ml-prev-btn" class="ml-nav-btn" aria-label="Previous chapter">&lt;</button>
+                    <button type="button" id="ml-next-btn" class="ml-nav-btn" aria-label="Next chapter">&gt;</button>
+                    <button type="button" id="ml-3d-btn" class="ml-fly-btn" title="Fly 3D camera to this monument">3D SPOT</button>
+                    <button type="button" id="ml-close-btn" class="ml-close-btn" aria-label="Return to 3D world">WORLD</button>
+                  </div>
+                </header>
+
+                <div id="ml-panel-lab" class="ml-panel ml-panel-lab">
+                  <div class="ml-canvas-frame">
+                    <div class="ml-canvas-toolbar">
+                      <button type="button" id="ml-play-btn" class="ml-tool-btn">PAUSE</button>
+                      <button type="button" id="ml-speed-btn" class="ml-tool-btn">1x</button>
+                      <button type="button" id="ml-rand-btn" class="ml-tool-btn">RANDOM</button>
+                      <button type="button" id="ml-reset-btn" class="ml-tool-btn" title="Reset sliders to chapter defaults">RESET</button>
+                      <button type="button" id="ml-mission-pill" class="ml-mission-pill" title="Open Activity &amp; Quiz tab">
+                        MISSION: ACTIVE
+                      </button>
+                      <span class="ml-drag-hint">DRAG CANVAS</span>
+                    </div>
+                    <canvas id="math-lab-canvas" width="720" height="320" aria-label="Interactive math simulation canvas"></canvas>
+                    <div id="ml-readout" class="ml-readout"></div>
+                  </div>
+                  <div class="ml-side-pane">
+                    <div class="ml-controls-col">
+                      <label class="ml-slider-label">
+                        <span id="ml-p1-name">Param 1</span>
+                        <input id="ml-p1-range" type="range" min="0" max="1" step="0.1" value="0.5" />
+                        <b id="ml-p1-val">0.5</b>
+                      </label>
+                      <label class="ml-slider-label">
+                        <span id="ml-p2-name">Param 2</span>
+                        <input id="ml-p2-range" type="range" min="0" max="1" step="0.1" value="0.5" />
+                        <b id="ml-p2-val">0.5</b>
+                      </label>
+                    </div>
+                    <div id="ml-presets" class="ml-presets"></div>
+                    <div class="ml-facts">
+                      <p><strong>AI &amp; Tech:</strong> <span id="ml-ai-text"></span></p>
+                      <p><strong>Real-World:</strong> <span id="ml-real-text"></span></p>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="ml-panel-activity" class="ml-panel ml-panel-activity" hidden>
+                  <section class="ml-activity-card ml-mission-card" aria-label="Hands-on Lab Mission">
+                    <div class="ml-act-head">
+                      <span class="ml-act-tag">HANDS-ON LAB MISSION &middot; +50 XP</span>
+                      <span id="ml-act-mission-state" class="ml-act-state">IN PROGRESS</span>
+                    </div>
+                    <h3 id="ml-act-mission-title" class="ml-act-title">Mission Objective</h3>
+                    <p id="ml-act-mission-hint" class="ml-act-hint"></p>
+                    <div id="ml-act-mission-status" class="ml-act-live">Live telemetry: --</div>
+                    <button type="button" id="ml-act-goto-lab-btn" class="ml-act-btn">
+                      SOLVE IN INTERACTIVE LAB &rarr;
+                    </button>
+                  </section>
+                  <section class="ml-activity-card ml-quiz-card" aria-label="Chapter Mini Quiz">
+                    <div class="ml-act-head">
+                      <span class="ml-act-tag">CHAPTER MINI-QUIZ &middot; +25 XP EACH</span>
+                      <span id="ml-activity-score" class="ml-act-score">0 / 3 SOLVED</span>
+                    </div>
+                    <div id="ml-quiz-list" class="ml-quiz-list"></div>
+                  </section>
+                </div>
+
+                <div id="ml-panel-sheet" class="ml-panel ml-panel-sheet" hidden>
+                  <div class="ml-sheet-wrap">
+                    <img id="ml-sheet-img" alt="Math chapter blueprint sheet" referrerpolicy="no-referrer" />
+                  </div>
+                  <p id="ml-syllabus-text" class="ml-syllabus-copy"></p>
+                </div>
+              </section>
+
+              <!-- Console Pause Menu Overlay -->
+              <section id="pause-overlay" class="pause-overlay" aria-label="Console pause menu" hidden>
+                <div class="pause-card">
+                  <h3>PAUSED &middot; MATH_LAND</h3>
+                  <p class="pause-credit">MADE BY &ldquo;AARUTO&rdquo; + &ldquo;DIPU-_-&rdquo;</p>
+                  <p id="pause-stats" class="pause-stats">RANK: VOXEL NOVICE &middot; XP 0000 &middot; 0/20 LABS</p>
+                  <button type="button" id="pause-resume-btn" class="pause-btn is-primary">RESUME 3D WORLD</button>
+                  <button type="button" id="pause-labs-btn" class="pause-btn">OPEN 20 MATH LABS</button>
+                  <button type="button" id="pause-dev-btn" class="pause-btn is-gold">VISIT DEV ARCADE HQ</button>
+                  <button type="button" id="pause-tour-btn" class="pause-btn">AUTO TOUR ISLAND</button>
+                  <button type="button" id="pause-add-btn" class="pause-btn">+ ADD 3D CREATION</button>
+                  <button type="button" id="pause-home-btn" class="pause-btn">RECENTRE ISLAND</button>
+                  <button type="button" id="pause-expand-btn" class="pause-btn">TOGGLE FULLSCREEN</button>
+                </div>
+              </section>
+
+              <!-- Power Off Standby Screen -->
+              <div id="power-off-screen" class="power-off-screen" aria-hidden="true" hidden>
+                <span class="power-off-dot"></span>
+                <small>POWER OFF &middot; FLIP SWITCH TO BOOT MATH_LAND</small>
+              </div>
+            </div>
+
+            <div class="screen-footer">
+              <span id="power-light" class="power-light on"></span>
+              <span>POWER</span>
+              <span class="footer-brand"><strong>PIXBOY</strong> <em>COLOR</em> &middot; AARUTO + DIPU-_-</span>
+              <b id="screen-footer-title">MATH_LAND 3D</b>
+            </div>
+          </div>
+
+          <!-- Right Console Grip: START, A/B Buttons, Speaker -->
+          <div class="console-grip grip-right">
+            <div class="grip-top-slot">
+              <div class="utility-button">
+                <button type="button" id="btn-start" aria-label="Pause or open console menu"></button>
+                <span>START</span>
+              </div>
+            </div>
+
+            <div class="action-cluster">
+              <div>
+                <button type="button" id="btn-b" class="action b" aria-label="Cycle camera mode or go back">B</button>
+                <span>CAM</span>
+              </div>
+              <div>
+                <button type="button" id="btn-a" class="action a" aria-label="Interact, jump, or visit chapter">A</button>
+                <span>ACT</span>
+              </div>
+            </div>
+
+            <div class="grip-bottom-slot">
+              <div class="speaker" aria-label="Speaker">
+                <i></i>
+                <i></i>
+                <i></i>
+                <i></i>
+                <i></i>
+                <i></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bottom 20 Math & AI Chapter Cartridges Dock -->
+      <section class="cartridge-panel" aria-label="20 Math Chapter Cartridges">
+        <div class="cartridge-header">
+          <span>20 CHAPTER CARTRIDGES &middot; CLICK TO LAUNCH LAB OR BLUEPRINT SHEET</span>
+          <button type="button" id="open-atlas-right-btn" class="cartridge-atlas-btn">
+            OPEN ACTIVE LAB
+          </button>
+        </div>
+        <div id="chapter-rack" class="chapter-rack" role="list"></div>
+        <div class="attraction-bar">
+          <span class="attraction-bar-title">DEV HQ &amp; INTERACTIVE 3D TOYS</span>
+          <div id="attraction-rack" class="attraction-rack" role="list"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Unclipped Hover Nameplate (placed outside overflow-hidden screen) -->
+    <div id="hover-card" class="hover-card" hidden>
+      <div id="hover-name" class="hover-name"></div>
+      <div id="hover-feed" class="hover-feed" hidden></div>
+      <div id="hover-status" class="hover-status"></div>
+    </div>
+
+    <dialog id="avatar-dialog" class="avatar-dialog" closedby="any" aria-label="Character customizer"></dialog>
+
+    <script type="module" src="/client/app.js"></script>
+  </body>
+</html>

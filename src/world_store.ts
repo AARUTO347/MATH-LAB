@@ -504,23 +504,21 @@ export class WorldStore {
         ? [...base.terrainZones, ...privPatch.terrainZones].slice(0, 28)
         : base.terrainZones,
       contributorCount: base.contributorCount + (privCreations.length > 0 ? 1 : 0),
-      contributionCount: base.contributionCount + privCreations.length,
+      contributionCount: (base.contributionCount ?? 0) + privCreations.length,
     };
   }
 
-  public lookupTodayCreation(cookieId: string, _dayKey: string): string | null {
-    if (!cookieId) return null;
-    const priv = this.privateCreationsByCookie.get(cookieId);
-    if (priv && priv.length > 0) {
-      return priv[priv.length - 1].id;
-    }
+  public lookupTodayCreation(_cookieId: string, _dayKey: string): string | null {
+    // Allow visitors to sculpt and keep multiple buildings/creations across sessions
     return null;
   }
 
   public getWorldSnapshot(cookieId: string, dayKey: string): WorldStateSnapshot {
-    const base = this.getVisitorWorld(cookieId);
-    const myCreationId = this.lookupTodayCreation(cookieId, dayKey);
-    const myActiveJob = !myCreationId ? this.lookupActiveJobForCookie(cookieId, dayKey) : null;
+    const base = this.readBaseWorld();
+    const myActiveJob = this.lookupActiveJobForCookie(cookieId, dayKey);
+    const visitorBuilds = this.creatorBuilds.filter((cb) => cb.cookieId === cookieId);
+    const myCreationId =
+      visitorBuilds.length > 0 ? visitorBuilds[visitorBuilds.length - 1].creationId : null;
     return {
       ...base,
       myCreationId,
@@ -533,30 +531,24 @@ export class WorldStore {
     removedCount: number;
     cancelledJobs: number;
   } {
+    // Keep all placed buildings and creations saved! Only cancel in-flight jobs if requested.
     if (!cookieId) {
       return { ok: true, removedCount: 0, cancelledJobs: 0 };
     }
     const now = Date.now();
-    this.cancelledBeforeByCookie.set(cookieId, now);
-    const removedCount = this.privateCreationsByCookie.get(cookieId)?.length || 0;
-    this.privateCreationsByCookie.delete(cookieId);
-    this.privatePatchesByCookie.delete(cookieId);
-    this.creatorBuilds = this.creatorBuilds.filter((cb) => cb.cookieId !== cookieId);
-    this.rateLimits.delete(`gen_cid:${cookieId}`);
-
     let cancelledJobs = 0;
     for (const j of this.jobs) {
       if (j.cookieId === cookieId && (j.status === "queued" || j.status === "sculpting")) {
         j.cancelled = true;
         j.status = "failed";
         j.finishedAt = now;
-        j.errorMsg = "World reset on console power-off.";
+        j.errorMsg = "Build job cancelled.";
         j.imageBase64 = null;
         cancelledJobs++;
       }
     }
-    this.jobs = this.jobs.filter((j) => j.cookieId !== cookieId);
-    return { ok: true, removedCount, cancelledJobs };
+    this.jobs = this.jobs.filter((j) => !(j.cookieId === cookieId && j.cancelled));
+    return { ok: true, removedCount: 0, cancelledJobs };
   }
 
   private auditAndRepairWorld(): { repairedCount: number; repairs: string[] } {
@@ -1125,7 +1117,7 @@ export class WorldStore {
         ok: false,
         status: 429,
         retryAfterSec: 20,
-        error: "The GeminIsland build queue is full right now — please try again in 20 seconds.",
+        error: "The MATH_LAND build queue is full right now — please try again in 20 seconds.",
       };
     }
 
@@ -1913,27 +1905,39 @@ export class WorldStore {
       createdAt: now,
     };
 
-    const ownerKey = input.cookieId || "__anon__";
-    const privCreations = this.privateCreationsByCookie.get(ownerKey) || [];
-    privCreations.push(creation);
-    this.privateCreationsByCookie.set(ownerKey, privCreations);
+    this.creations.push(creation);
 
-    const worldWithNew = this.getVisitorWorld(ownerKey);
-    const initialPatch = buildInitialIntegration(worldWithNew, creation);
-    const privPatch = this.privatePatchesByCookie.get(ownerKey) || {
-      paths: [],
-      props: [],
-      terrainZones: [],
-    };
-    if (initialPatch.newPaths?.length) privPatch.paths.push(...initialPatch.newPaths);
-    if (initialPatch.newProps?.length) privPatch.props.push(...initialPatch.newProps);
+    const initialPatch = buildInitialIntegration(this.readBaseWorld(), creation);
+    if (initialPatch.newPaths?.length) this.paths.push(...initialPatch.newPaths);
+    if (initialPatch.newProps?.length) this.props.push(...initialPatch.newProps);
     if (initialPatch.newTerrainZones?.length) {
-      privPatch.terrainZones.push(...initialPatch.newTerrainZones);
+      this.terrainZones = [...this.terrainZones, ...initialPatch.newTerrainZones].slice(0, 28);
     }
-    this.privatePatchesByCookie.set(ownerKey, privPatch);
 
-    const finalSnap = this.getWorldSnapshot(ownerKey, input.dayKey);
+    if (input.cookieId) {
+      this.creatorBuilds.push({
+        cookieId: input.cookieId,
+        dayKey: input.dayKey,
+        creationId: creation.id,
+        createdAt: now,
+      });
+    }
+
+    this.version += 1;
+    this.auditAndRepairWorld();
+    this.schedulePersist();
+
+    const finalSnap = this.getWorldSnapshot(input.cookieId, input.dayKey);
     const updatedCreation = finalSnap.creations.find((c) => c.id === creation.id) ?? creation;
+
+    this.onBroadcast({
+      type: "creation_placed",
+      creation: updatedCreation,
+      world: { ...this.readBaseWorld(), myCreationId: creation.id },
+    });
+
+    this.integrationQueue.add(creation.id);
+    void this.drainIntegrationQueue();
 
     return {
       ok: true,

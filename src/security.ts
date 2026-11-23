@@ -118,6 +118,12 @@ export function isAllowedAppletOrigin(origin: string): boolean {
   if (ALLOWED_STATIC_ORIGINS.has(origin)) return true;
   try {
     const parsed = new URL(origin);
+    if (
+      parsed.protocol === "http:" &&
+      (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1")
+    ) {
+      return true;
+    }
     if (parsed.protocol !== "https:") {
       return false;
     }

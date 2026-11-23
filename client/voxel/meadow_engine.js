@@ -1695,7 +1695,11 @@ class CreationSimEntity {
     this.isVegasSphere =
       creation.id === "c-mvoo26uh-4e0810" ||
       /vegas.*sphere|emoji.*sphere/i.test(creation.name || "");
-    this.isDrivableCar = creation.id === "math-turbo-roadster";
+    this.isDrivableCar =
+      creation.id === "math-turbo-roadster" ||
+      creation.id === "math-rally-coupe" ||
+      creation.id === "math-dune-buggy" ||
+      (creation.category === "vehicle" && creation.behavior?.type !== "vehicle_route");
     this.isRailTrain = creation.id === "math-express-train";
     this.isDrivenCar = false;
     this.hasBeenDriven = false;
@@ -1902,7 +1906,11 @@ class CreationSimEntity {
     this.isVegasSphere =
       creation.id === "c-mvoo26uh-4e0810" ||
       /vegas.*sphere|emoji.*sphere/i.test(creation.name || "");
-    this.isDrivableCar = creation.id === "math-turbo-roadster";
+    this.isDrivableCar =
+      creation.id === "math-turbo-roadster" ||
+      creation.id === "math-rally-coupe" ||
+      creation.id === "math-dune-buggy" ||
+      (creation.category === "vehicle" && creation.behavior?.type !== "vehicle_route");
     this.isRailTrain = creation.id === "math-express-train";
     this.footprintRadius = this.isDualTransit
       ? 3.1
@@ -3660,6 +3668,9 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     steer: 0,
     turbo: false,
     lastHudEmitMs: 0,
+    assistThrottle: 0,
+    assistSteer: 0,
+    assistTurbo: false,
   };
 
   const remotePlayers = new RemotePlayerManager();
@@ -5577,18 +5588,24 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       pitch: fp.pitch,
     });
     if (!target && fp.active && !inside) {
-      const roadsterEnt = ensureCreationBuilt("math-turbo-roadster");
-      if (roadsterEnt) {
-        const dCar = Math.hypot(roadsterEnt.x - fp.x, roadsterEnt.z - fp.z);
-        if (dCar < 5.6) {
-          target = {
-            kind: "drive_car",
-            id: roadsterEnt.id,
-            label: "Drive Pixel Turbo Roadster",
-            keyHint: "E",
-            execute: () => driveCarById(roadsterEnt.id),
-          };
+      let bestCar = null;
+      let bestCarDist = 5.6;
+      for (const ent of creationEntities.values()) {
+        if (!ent.isDrivableCar) continue;
+        const dCar = Math.hypot(ent.x - fp.x, ent.z - fp.z);
+        if (dCar < bestCarDist) {
+          bestCarDist = dCar;
+          bestCar = ent;
         }
+      }
+      if (bestCar) {
+        target = {
+          kind: "drive_car",
+          id: bestCar.id,
+          label: `Drive ${bestCar.data?.name || "Car"}`,
+          keyHint: "E",
+          execute: () => driveCarById(bestCar.id),
+        };
       }
     }
     if (!target && fp.active && !inside) {
@@ -5980,7 +5997,13 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
   function boardVehicleById(rideId, preferredSeat = 0) {
     if (!rideId) return false;
     const baseId = String(rideId).replace(/#(?:sec|tram)$/, "");
-    if (baseId === "math-turbo-roadster") {
+    const targetEnt = creationEntities.get(baseId);
+    if (
+      baseId === "math-turbo-roadster" ||
+      baseId === "math-rally-coupe" ||
+      baseId === "math-dune-buggy" ||
+      targetEnt?.isDrivableCar
+    ) {
       return driveCarById(baseId);
     }
     if (driveState.active) {
@@ -6179,6 +6202,9 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
     actionHandTimer = 0.36;
     const res = target.execute?.();
+    if (res && typeof res === "object") {
+      callbacks.onInteriorPropInteract?.(res);
+    }
     refreshInteractionTarget();
     return Boolean(res?.ok ?? true);
   }
@@ -7479,9 +7505,9 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
       if (driveState.active && driveState.ent) {
         const ent = driveState.ent;
-        const steerIn = Math.max(-1, Math.min(1, inRight));
-        const throttleIn = Math.max(-1, Math.min(1, inFwd));
-        const turboOn = Boolean(sprint && throttleIn > 0.1);
+        const steerIn = Math.max(-1, Math.min(1, inRight + (driveState.assistSteer || 0)));
+        const throttleIn = Math.max(-1, Math.min(1, inFwd + (driveState.assistThrottle || 0)));
+        const turboOn = Boolean((sprint || driveState.assistTurbo) && throttleIn > 0.1);
         driveState.turbo = turboOn;
         driveState.steer += (steerIn - driveState.steer) * (1 - Math.exp(-dt * 10));
 
@@ -8405,9 +8431,28 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
     driveCarById,
     exitCarDrive,
     blowVehicleHorn,
+    rotateLook: (dYaw = 0, dPitch = 0) => {
+      if (fp.active) {
+        fp.goalYaw += Number(dYaw) || 0;
+        fp.goalPitch = Math.max(
+          FP_MIN_PITCH,
+          Math.min(FP_MAX_PITCH, fp.goalPitch + (Number(dPitch) || 0)),
+        );
+      } else {
+        cam.goalAz += Number(dYaw) || 0;
+        cam.goalEl = Math.max(MIN_EL, Math.min(MAX_EL, cam.goalEl - (Number(dPitch) || 0)));
+        if (dragMode === "pan") setDragMode("orbit");
+      }
+    },
+    setDriveAssist: (patch = {}) => {
+      if (typeof patch.throttle === "number") driveState.assistThrottle = patch.throttle;
+      if (typeof patch.steer === "number") driveState.assistSteer = patch.steer;
+      if (typeof patch.turbo === "boolean") driveState.assistTurbo = patch.turbo;
+    },
     getDriveState: () => ({
       active: driveState.active,
       id: driveState.ent?.id || null,
+      name: driveState.ent?.data?.name || null,
       speedKmh: Math.round(Math.abs(driveState.speed) * 6.4),
       turbo: driveState.turbo,
     }),

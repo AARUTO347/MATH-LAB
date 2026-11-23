@@ -2,7 +2,13 @@ import { createMeadowWorldEngine } from "./voxel/meadow_engine.js";
 import { createCharacterBuilderController } from "./character_builder.js";
 import { createMultiplayerClient } from "./multiplayer_client.js";
 import { MATH_CHAPTERS, WORLD_ATTRACTIONS, getMathChapterByCreationId } from "./math_chapters.js";
-import { renderChapterLabFrame, evaluateChapterMission, mapCanvasPointerToParams } from "./math_labs.js";
+import {
+  renderChapterLabFrame,
+  evaluateChapterMission,
+  mapCanvasPointerToParams,
+  getStepByStepBreakdown,
+  sampleCurveAudioValue,
+} from "./math_labs.js";
 import {
   isSoundEnabled,
   setSoundEnabled,
@@ -12,6 +18,23 @@ import {
   playMissionFanfare,
   playFireworkBurst,
 } from "./sound_fx.js";
+
+// Anti-copy & smooth touch-screen gameplay guards (allow typing/copy inside input & textarea fields)
+document.addEventListener("contextmenu", (e) => {
+  if (!e.target?.closest?.("input, textarea, select")) {
+    e.preventDefault();
+  }
+});
+document.addEventListener("selectstart", (e) => {
+  if (!e.target?.closest?.("input, textarea, select")) {
+    e.preventDefault();
+  }
+});
+document.addEventListener("copy", (e) => {
+  if (!e.target?.closest?.("input, textarea, select")) {
+    e.preventDefault();
+  }
+});
 
 const urlParams = new URLSearchParams(location.search);
 const isOgCapture = urlParams.get("og") === "1";
@@ -342,8 +365,14 @@ engine = createMeadowWorldEngine(
       if (creation.id === "math-dev-hq") {
         playFireworkBurst();
         markDiscovered("math-dev-hq", "AARUTO + DIPU-_- Dev Arcade HQ", 25);
+        completeQuest("visit_dev_hq");
         showToast('AARUTO + DIPU-_- Dev Arcade HQ — "Welcome to MATH_LAND!"', 4200);
         return;
+      }
+      if (creation.id.startsWith("math-park-")) {
+        completeQuest("visit_basic_park");
+      } else if (creation.id.startsWith("math-exp-")) {
+        completeQuest("visit_exp_yard");
       }
       const attr = WORLD_ATTRACTIONS.find((a) => a.id === creation.id);
       if (attr) {
@@ -366,6 +395,11 @@ engine = createMeadowWorldEngine(
     onInteractiveEvent(creation, message) {
       if (creation?.id) {
         markDiscovered(creation.id, creation.name || creation.id, 20);
+        if (creation.id.startsWith("math-park-")) {
+          completeQuest("visit_basic_park");
+        } else if (creation.id.startsWith("math-exp-")) {
+          completeQuest("visit_exp_yard");
+        }
       }
       if (!message || isOgCapture) return;
       showToast(message);
@@ -419,6 +453,7 @@ engine = createMeadowWorldEngine(
     onInteriorChange(roomInfo) {
       if (roomInfo) {
         document.body.dataset.inInterior = "1";
+        completeQuest("enter_house");
         if (uiState === "picking" || uiState === "composing") {
           hideError();
           chosenSpot = null;
@@ -430,6 +465,44 @@ engine = createMeadowWorldEngine(
       }
       hoverCard.hidden = true;
       mpClient?.forcePoseSync();
+    },
+    onInteriorPropInteract(res) {
+      if (!res) return;
+      if (res.uiAction === "open_quest_book") {
+        completeQuest("open_quest_book");
+        openQuestDialog();
+        return;
+      }
+      if (res.uiAction === "tv_channel") {
+        completeQuest("tv_channel");
+      } else if (res.uiAction === "brew_tea") {
+        completeQuest("brew_tea");
+      }
+      if (res.message && !isOgCapture) {
+        showToast(res.message, 3600);
+      }
+    },
+    onDriveTelemetry(info) {
+      if (!driveHudEl) return;
+      const active = Boolean(info?.active);
+      driveHudEl.hidden = !active || isOgCapture;
+      if (active) {
+        completeQuest("drive_car");
+        if (driveCarNameEl) {
+          driveCarNameEl.textContent = String(info.carName || "ROADSTER").toUpperCase();
+        }
+        if (driveSpeedEl) {
+          driveSpeedEl.textContent = `${String(Math.round(Math.abs(info.speedKmh || 0))).padStart(2, "0")} km/h`;
+        }
+      }
+    },
+    onRideTrainChange(info) {
+      if (!trainHudEl) return;
+      const riding = Boolean(info?.riding);
+      trainHudEl.hidden = !riding || isOgCapture;
+      if (riding) {
+        completeQuest("ride_train");
+      }
     },
     onTrafficIncident(incident) {
       void reportTrafficIncidentToObserver(incident);
@@ -626,7 +699,7 @@ function syncDockUI() {
   readyGotoBtn.hidden = true;
   locateMineBtn.hidden = true;
 
-  if (myCreationId && uiState !== "ready") {
+  if (myCreationId && uiState === "idle") {
     uiState = "placed";
   }
 
@@ -664,6 +737,8 @@ function syncDockUI() {
       break;
     }
     case "placed": {
+      addBtn.hidden = false;
+      addBtn.textContent = "+ Add More";
       locateMineBtn.hidden = false;
       const mine = worldData?.creations?.find((c) => c.id === myCreationId);
       locateMineLabel.textContent = mine ? `Locate · ${mine.name}` : "Locate yours";
@@ -672,6 +747,7 @@ function syncDockUI() {
     }
     default:
       addBtn.hidden = false;
+      addBtn.textContent = "+ Add";
       engine.setSpotPickerState({ mode: "hidden" });
       break;
   }
@@ -750,15 +826,10 @@ promptInput.addEventListener("input", () => {
   engine.setPreviewPrompt(promptInput.value);
 });
 
-// 1. Click "+ Add" -> pick where on the island it will go
+// 1. Click "+ Add" -> pick where on the island it will go (always allows creating additional builds!)
 addBtn.addEventListener("click", () => {
   if (engine.isFirstPerson()) {
     engine.setDragMode("pan");
-  }
-  if (myCreationId) {
-    uiState = "placed";
-    syncDockUI();
-    return;
   }
   hoverCard.hidden = true;
   engine.setPreviewPrompt(promptInput.value);
@@ -1192,10 +1263,12 @@ async function initWorld() {
 }
 
 // ---------------- PIXBOY Console Hardware, 20-Chapter Rack & Interactive Math Labs ----------------
+const gradeFilterBar = document.getElementById("grade-filter-bar");
 const chapterRackEl = document.getElementById("chapter-rack");
 const attractionRackEl = document.getElementById("attraction-rack");
 const mathLabOverlay = document.getElementById("math-lab-overlay");
 const mlBadgeEl = document.getElementById("ml-badge");
+const mlCbseBadgeEl = document.getElementById("ml-cbse-badge");
 const mlTitleEl = document.getElementById("ml-title");
 const mlPrevBtn = document.getElementById("ml-prev-btn");
 const mlNextBtn = document.getElementById("ml-next-btn");
@@ -1213,6 +1286,8 @@ const mlPlayBtn = document.getElementById("ml-play-btn");
 const mlSpeedBtn = document.getElementById("ml-speed-btn");
 const mlRandBtn = document.getElementById("ml-rand-btn");
 const mlResetBtn = document.getElementById("ml-reset-btn");
+const mlExpModeBtn = document.getElementById("ml-exp-mode-btn");
+const mlExpActionBtn = document.getElementById("ml-exp-action-btn");
 const mlMissionPill = document.getElementById("ml-mission-pill");
 const mlP1Name = document.getElementById("ml-p1-name");
 const mlP1Range = document.getElementById("ml-p1-range");
@@ -1234,6 +1309,42 @@ const mlActGotoLabBtn = document.getElementById("ml-act-goto-lab-btn");
 const mlActivityScore = document.getElementById("ml-activity-score");
 const mlQuizList = document.getElementById("ml-quiz-list");
 
+const mlThemeBtn = document.getElementById("ml-theme-btn");
+const mlTangentBtn = document.getElementById("ml-tangent-btn");
+const mlIntegralBtn = document.getElementById("ml-integral-btn");
+const mlPolarBtn = document.getElementById("ml-polar-btn");
+const mlZoomInBtn = document.getElementById("ml-zoom-in-btn");
+const mlZoomOutBtn = document.getElementById("ml-zoom-out-btn");
+const mlSnapBtn = document.getElementById("ml-snap-btn");
+const mlSonifyBtn = document.getElementById("ml-sonify-btn");
+const mlExprRow = document.getElementById("ml-expr-row");
+const mlExprAInput = document.getElementById("ml-expr-a");
+const mlExprBInput = document.getElementById("ml-expr-b");
+const mlStepsBox = document.getElementById("ml-steps-box");
+const mlTutorModelSelect = document.getElementById("ml-tutor-model");
+const mlTtsEngineSelect = document.getElementById("ml-tts-engine");
+const mlTutorInput = document.getElementById("ml-tutor-input");
+const mlTutorAskBtn = document.getElementById("ml-tutor-ask-btn");
+const mlTutorSpeakBtn = document.getElementById("ml-tutor-speak-btn");
+const mlTutorAnswerEl = document.getElementById("ml-tutor-answer");
+
+const driveHudEl = document.getElementById("drive-hud");
+const driveCarNameEl = document.getElementById("drive-car-name");
+const driveSpeedEl = document.getElementById("drive-speed");
+const driveLeftBtn = document.getElementById("drive-left-btn");
+const driveRightBtn = document.getElementById("drive-right-btn");
+const driveGasBtn = document.getElementById("drive-gas-btn");
+const driveBrakeBtn = document.getElementById("drive-brake-btn");
+const driveTurboBtn = document.getElementById("drive-turbo-btn");
+const driveHornBtn = document.getElementById("drive-horn-btn");
+const driveExitBtn = document.getElementById("drive-exit-btn");
+
+const trainHudEl = document.getElementById("train-hud");
+const trainWhistleBtn = document.getElementById("train-whistle-btn");
+const trainExitBtn = document.getElementById("train-exit-btn");
+
+const questDialogEl = document.getElementById("quest-dialog");
+
 const pauseOverlay = document.getElementById("pause-overlay");
 const pauseStatsEl = document.getElementById("pause-stats");
 const powerOffScreen = document.getElementById("power-off-screen");
@@ -1253,9 +1364,25 @@ const scoreXpEl = document.getElementById("score-xp");
 const scoreMasteryEl = document.getElementById("score-mastery");
 const scoreChapterEl = document.getElementById("score-chapter");
 
+const WORLD_QUESTS = [
+  { id: "enter_house", title: "Cozy House Visitor", desc: "Walk into the MATH_LAND Cozy House or click HOUSE.", xp: 35, action: () => visitWorldAttraction({ id: "math-house-clubhouse", label: "Cozy House & Quests", desc: "Enter to explore Quest Book, 4-Ch TV & Honey Tea" }) },
+  { id: "open_quest_book", title: "Scholar's Quest Book", desc: "Open the Quest Book inside Cozy House or press QUESTS.", xp: 30 },
+  { id: "tv_channel", title: "4-Channel Math TV", desc: "Switch channels on the retro TV inside Cozy House.", xp: 25 },
+  { id: "brew_tea", title: "Cozy Honey Tea", desc: "Brew steaming honey tea at the Cozy House coffee table.", xp: 25 },
+  { id: "drive_car", title: "Island Speedster", desc: "Drive the Roadster, Rally Coupe, or Dune Buggy (press E near car).", xp: 40, action: () => visitWorldAttraction({ id: "math-turbo-roadster", label: "Crimson Roadster", desc: "Press E near any car to drive" }) },
+  { id: "ride_train", title: "Express Rail Passenger", desc: "Board the MATH_LAND Express steam train loop.", xp: 40, action: () => visitWorldAttraction({ id: "math-express-train", label: "MATH_LAND Express", desc: "Press E to board the steam train" }) },
+  { id: "visit_dev_hq", title: "Creator Celebration", desc: "Trigger fireworks at AARUTO + DIPU-_- Dev Arcade HQ.", xp: 30, action: () => visitWorldAttraction(WORLD_ATTRACTIONS[0]) },
+  { id: "visit_basic_park", title: "Basic Math Park Explorer", desc: "Play with the Abacus, Fraction Stand, or Balance Scale in Basic Math Park.", xp: 35, action: () => visitWorldAttraction(WORLD_ATTRACTIONS.find((a) => a.id === "math-park-abacus")) },
+  { id: "visit_exp_yard", title: "Experiment Yard Scientist", desc: "Test the Pendulum Tower, Rocket Launch Pad, or Ferris Wheel in Experiment Yard.", xp: 40, action: () => visitWorldAttraction(WORLD_ATTRACTIONS.find((a) => a.id === "math-exp-rocket")) },
+  { id: "run_experiment", title: "Real-Life Math Experiment", desc: "Activate EXPMT mode & click a trial button inside any interactive lab.", xp: 40, action: () => openMathLabById("06") },
+  { id: "solve_graph_lab", title: "Graphing Studio Explorer", desc: "Open Chapter 20 Graphing Studio and test f(x) or Polar r(θ).", xp: 40, action: () => openMathLabById("20") },
+  { id: "ask_gemini", title: "Ask Gemini Math Tutor", desc: "Ask Gemini 2.5 Flash for a breakdown inside any Math Lab.", xp: 35 },
+  { id: "listen_tts", title: "Spoken Audio Lesson", desc: "Listen to a spoken Gemini TTS audio lesson.", xp: 35 },
+];
+
 const PROGRESS_STORAGE_KEY = "mathland_progress_v1";
 const explorerProgress = (() => {
-  const blank = { xp: 0, discoveredIds: [], solvedMissions: [], quizCorrect: [], quizPicked: {} };
+  const blank = { xp: 0, discoveredIds: [], solvedMissions: [], quizCorrect: [], quizPicked: {}, questsDone: [] };
   try {
     const raw = typeof localStorage !== "undefined" ? localStorage.getItem(PROGRESS_STORAGE_KEY) : null;
     if (!raw) return blank;
@@ -1266,6 +1393,7 @@ const explorerProgress = (() => {
       solvedMissions: Array.isArray(parsed?.solvedMissions) ? parsed.solvedMissions : [],
       quizCorrect: Array.isArray(parsed?.quizCorrect) ? parsed.quizCorrect : [],
       quizPicked: parsed?.quizPicked && typeof parsed.quizPicked === "object" ? parsed.quizPicked : {},
+      questsDone: Array.isArray(parsed?.questsDone) ? parsed.questsDone : [],
     };
   } catch {
     return blank;
@@ -1279,6 +1407,115 @@ function saveProgress() {
     }
   } catch {
     // Ignore storage quota / sandbox restrictions
+  }
+}
+
+function completeQuest(questId) {
+  const q = WORLD_QUESTS.find((item) => item.id === questId);
+  if (!q || explorerProgress.questsDone.includes(questId)) return false;
+  explorerProgress.questsDone.push(questId);
+  const prevXp = explorerProgress.xp;
+  explorerProgress.xp += q.xp;
+  saveProgress();
+  syncScoreTelemetry();
+  if (!isOgCapture) {
+    playQuizCorrect();
+    showToast(`Quest Complete: ${q.title} (+${q.xp} XP)`, 3800);
+  }
+  maybeCelebrateRankUp(prevXp, explorerProgress.xp);
+  if (questDialogEl?.open) {
+    renderQuestDialog();
+  }
+  return true;
+}
+
+function renderQuestDialog() {
+  if (!questDialogEl) return;
+  const doneCount = explorerProgress.questsDone.length;
+  questDialogEl.innerHTML = "";
+  const shell = document.createElement("div");
+  shell.className = "quest-shell";
+
+  const head = document.createElement("div");
+  head.className = "quest-head";
+  const h2 = document.createElement("h2");
+  h2.textContent = `MATH_LAND QUEST BOOK (${doneCount}/${WORLD_QUESTS.length})`;
+  const headActions = document.createElement("div");
+  headActions.className = "quest-head-actions";
+
+  const speakBtn = document.createElement("button");
+  speakBtn.type = "button";
+  speakBtn.className = "ml-tool-btn is-gold";
+  speakBtn.textContent = "SPEAK BRIEFING";
+  speakBtn.addEventListener("click", () => {
+    const remaining = WORLD_QUESTS.filter((q) => !explorerProgress.questsDone.includes(q.id));
+    const msg = remaining.length
+      ? `Welcome to MATH_LAND! You have completed ${doneCount} of ${WORLD_QUESTS.length} quests. Next quest: ${remaining[0].title}. ${remaining[0].desc}`
+      : `Congratulations! You completed all ${WORLD_QUESTS.length} quests in MATH_LAND built by AARUTO and DIPU!`;
+    void speakWithGeminiTts(msg, speakBtn);
+  });
+
+  const closeBtn = document.createElement("button");
+  closeBtn.type = "button";
+  closeBtn.className = "ml-close-btn";
+  closeBtn.textContent = "CLOSE";
+  closeBtn.addEventListener("click", () => questDialogEl.close());
+
+  headActions.append(speakBtn, closeBtn);
+  head.append(h2, headActions);
+
+  const list = document.createElement("div");
+  list.className = "quest-list";
+  WORLD_QUESTS.forEach((q) => {
+    const done = explorerProgress.questsDone.includes(q.id);
+    const row = document.createElement("div");
+    row.className = `quest-row${done ? " is-done" : ""}`;
+
+    const info = document.createElement("div");
+    const t = document.createElement("h3");
+    t.className = "quest-row-title";
+    t.textContent = `${done ? "✓ " : ""}${q.title}`;
+    const d = document.createElement("p");
+    d.className = "quest-row-desc";
+    d.textContent = q.desc;
+    info.append(t, d);
+
+    const right = document.createElement("div");
+    right.style.display = "flex";
+    right.style.gap = "6px";
+    right.style.alignItems = "center";
+
+    if (q.action && !done) {
+      const goBtn = document.createElement("button");
+      goBtn.type = "button";
+      goBtn.className = "ml-tool-btn";
+      goBtn.textContent = "GO";
+      goBtn.addEventListener("click", () => {
+        questDialogEl.close();
+        q.action();
+      });
+      right.appendChild(goBtn);
+    }
+
+    const badge = document.createElement("span");
+    badge.className = "quest-row-badge";
+    badge.textContent = done ? `DONE +${q.xp}XP` : `+${q.xp} XP`;
+    right.appendChild(badge);
+
+    row.append(info, right);
+    list.appendChild(row);
+  });
+
+  shell.append(head, list);
+  questDialogEl.appendChild(shell);
+}
+
+function openQuestDialog() {
+  if (!questDialogEl || isOgCapture) return;
+  completeQuest("open_quest_book");
+  renderQuestDialog();
+  if (!questDialogEl.open) {
+    questDialogEl.showModal();
   }
 }
 
@@ -1345,6 +1582,7 @@ function markDiscovered(id, label, xpBonus = 20) {
 }
 
 let activeChapterIdx = 0;
+let activeGradeFilter = "all";
 let activeAttractionId = "";
 let arcadeHopIdx = -1;
 let labOpen = false;
@@ -1359,8 +1597,27 @@ let labSimTime = 0;
 let lastLabRafMs = 0;
 let focusedMonumentIdx = -1;
 
+const labExtras = {
+  theme: "dark",
+  zoom: 1,
+  panX: 0,
+  panY: 0,
+  traceX: 0.85,
+  showTangent: true,
+  showIntegral: false,
+  polarMode: false,
+  exprA: "p1 * sin(x) + p2 * 0.4",
+  exprB: "0.35 * x^2 - 1",
+  expMode: false,
+  expBusStops: 0,
+  expCartItems: 1,
+  expTrials: { n: 10, p: 0.5, counts: [], totalRuns: 0 },
+  expPulseStart: 0,
+};
+
 function syncScoreTelemetry() {
-  const count = worldData?.creations?.length ?? 203;
+  const totalChapters = MATH_CHAPTERS.length;
+  const count = worldData?.creations?.length ?? 214;
   const mastered = getMasteredChapterCount();
   if (scoreBuildsEl) {
     scoreBuildsEl.textContent = `${String(count).padStart(5, "0")} BUILDS`;
@@ -1369,34 +1626,54 @@ function syncScoreTelemetry() {
     scoreXpEl.textContent = `XP ${String(explorerProgress.xp).padStart(4, "0")}`;
   }
   if (scoreMasteryEl) {
-    scoreMasteryEl.textContent = `${mastered}/20★`;
+    scoreMasteryEl.textContent = `${mastered}/${totalChapters}★`;
   }
   if (pauseStatsEl) {
     const rank = getExplorerRank(explorerProgress.xp).toUpperCase();
-    pauseStatsEl.textContent = `RANK: ${rank} · XP ${String(explorerProgress.xp).padStart(4, "0")} · ${mastered}/20 CHAPTERS`;
+    pauseStatsEl.textContent = `RANK: ${rank} · XP ${String(explorerProgress.xp).padStart(4, "0")} · ${mastered}/${totalChapters} LABS`;
   }
   const ch = MATH_CHAPTERS[activeChapterIdx] || MATH_CHAPTERS[0];
   if (scoreChapterEl) {
-    scoreChapterEl.textContent = `CH ${ch.id} · ${ch.shortTitle.replace(/^\d+\s*/, "")}`;
+    scoreChapterEl.textContent = `CH ${ch.id} · ${ch.shortTitle.replace(/^[A-Z]?\d+\s*/, "")}`;
   }
+}
+
+function matchesGradeFilter(ch) {
+  if (!ch || activeGradeFilter === "all") return true;
+  if (activeGradeFilter === "basic") return Boolean(ch.isBasic);
+  return ch.gradeBand === activeGradeFilter;
 }
 
 function renderChapterRack() {
   if (!chapterRackEl) return;
   chapterRackEl.innerHTML = "";
   MATH_CHAPTERS.forEach((ch, idx) => {
+    if (!matchesGradeFilter(ch)) return;
     const mastered = isChapterMastered(ch);
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = `chapter-chip${idx === activeChapterIdx ? " is-active" : ""}${mastered ? " is-mastered" : ""}`;
     btn.textContent = mastered ? `★ ${ch.shortTitle}` : ch.shortTitle;
-    btn.title = `Ch.${ch.id}: ${ch.title}${mastered ? " (Mastered)" : ""}`;
+    btn.title = `${ch.id}: ${ch.title} (${ch.cbseClass || "CBSE"})${mastered ? " — Mastered" : ""}`;
     btn.setAttribute("role", "listitem");
     btn.addEventListener("click", () => {
       playBlip(580);
       openMathLabByIndex(idx);
     });
     chapterRackEl.appendChild(btn);
+  });
+}
+
+if (gradeFilterBar) {
+  gradeFilterBar.addEventListener("click", (e) => {
+    const btn = e.target?.closest?.(".grade-filter-btn[data-grade]");
+    if (!btn) return;
+    activeGradeFilter = btn.dataset.grade || "all";
+    gradeFilterBar.querySelectorAll(".grade-filter-btn").forEach((b) => {
+      b.classList.toggle("is-active", b === btn);
+    });
+    playBlip(540);
+    renderChapterRack();
   });
 }
 
@@ -1433,8 +1710,11 @@ function visitWorldAttraction(attr) {
   const fxMsg = attr.id === "math-dev-hq" ? ent?.interactive?.trigger?.() : null;
   if (attr.id === "math-dev-hq") {
     playFireworkBurst();
+    completeQuest("visit_dev_hq");
   } else {
     playConfirm();
+    if (attr.id.startsWith("math-park-")) completeQuest("visit_basic_park");
+    if (attr.id.startsWith("math-exp-")) completeQuest("visit_exp_yard");
   }
   const newlyFound = markDiscovered(attr.id, attr.label, attr.id === "math-dev-hq" ? 25 : 20);
   if (fxMsg) {
@@ -1609,7 +1889,17 @@ function loadChapterIntoLabUI(idx) {
   labP1 = ch.p1Default;
   labP2 = ch.p2Default;
 
+  // Reset per-lab viewport & experiment transient states cleanly when switching chapters
+  labExtras.zoom = 1;
+  labExtras.panX = 0;
+  labExtras.panY = 0;
+  labExtras.traceX = 0.85;
+  labExtras.expMode = false;
+  labExtras.expBusStops = 0;
+  labExtras.expCartItems = 1;
+
   if (mlBadgeEl) mlBadgeEl.textContent = `CH ${ch.id}`;
+  if (mlCbseBadgeEl) mlCbseBadgeEl.textContent = ch.cbseClass || "Class 11–12";
   if (mlTitleEl) mlTitleEl.textContent = ch.title;
   if (screenFooterTitle) screenFooterTitle.textContent = labOpen ? `CH ${ch.id} · ${ch.title.toUpperCase()}` : "MATH_LAND 3D";
   if (mlP1Name) mlP1Name.textContent = ch.p1Label;
@@ -1632,10 +1922,33 @@ function loadChapterIntoLabUI(idx) {
 
   if (mlAiText) mlAiText.textContent = ch.aiUses;
   if (mlRealText) mlRealText.textContent = ch.realLife;
-  if (mlSyllabusText) mlSyllabusText.textContent = `${ch.labTitle} — ${ch.syllabus}`;
+  if (mlSyllabusText) mlSyllabusText.textContent = `${ch.labTitle} (${ch.cbseClass || "CBSE"}) — ${ch.syllabus}`;
   if (mlSheetImg) {
     mlSheetImg.src = ch.image;
     mlSheetImg.alt = `Chapter ${ch.id}: ${ch.title} reference sheet`;
+  }
+
+  // Contextual toolbar visibility
+  const showGraphTools = Boolean(ch.supportsGraphTools);
+  if (mlExprRow) mlExprRow.hidden = !showGraphTools;
+  if (mlTangentBtn) mlTangentBtn.hidden = !showGraphTools;
+  if (mlIntegralBtn) mlIntegralBtn.hidden = !showGraphTools;
+  if (mlPolarBtn) mlPolarBtn.hidden = !showGraphTools;
+
+  const hasExp = Boolean(ch.hasExperiment);
+  if (mlExpModeBtn) {
+    mlExpModeBtn.hidden = !hasExp;
+    mlExpModeBtn.classList.remove("is-active");
+    mlExpModeBtn.textContent = "EXPMT";
+    mlExpModeBtn.title = ch.experimentTitle || "Toggle Real-Life Experiment";
+  }
+  if (mlExpActionBtn) {
+    mlExpActionBtn.hidden = !hasExp;
+    mlExpActionBtn.textContent = ch.experimentActionLabel || "RUN TRIAL";
+  }
+
+  if (mlTutorAnswerEl) {
+    mlTutorAnswerEl.textContent = "Click ASK for a Gemini 2.5 Flash breakdown or SPEAK TTS to listen.";
   }
 
   if (mlPresetsEl) {
@@ -1646,6 +1959,18 @@ function loadChapterIntoLabUI(idx) {
       b.className = "ml-preset-btn";
       b.textContent = preset.label;
       b.addEventListener("click", () => {
+        if (typeof preset.exprA === "string") {
+          labExtras.exprA = preset.exprA;
+          if (mlExprAInput) mlExprAInput.value = preset.exprA;
+        }
+        if (typeof preset.exprB === "string") {
+          labExtras.exprB = preset.exprB;
+          if (mlExprBInput) mlExprBInput.value = preset.exprB;
+        }
+        if (typeof preset.polarMode === "boolean") {
+          labExtras.polarMode = preset.polarMode;
+          mlPolarBtn?.classList.toggle("is-active", labExtras.polarMode);
+        }
         applyLabParams(preset.p1, preset.p2);
       });
       mlPresetsEl.appendChild(b);
@@ -1664,10 +1989,13 @@ function openMathLabByIndex(idx) {
   hoverCard.hidden = true;
   engine?.releaseWalkPointerLock?.();
   loadChapterIntoLabUI(idx);
+  const ch = MATH_CHAPTERS[activeChapterIdx];
+  if (ch?.id === "20") {
+    completeQuest("solve_graph_lab");
+  }
   labOpen = true;
   if (mathLabOverlay) mathLabOverlay.hidden = false;
-  if (screenFooterTitle) {
-    const ch = MATH_CHAPTERS[activeChapterIdx];
+  if (screenFooterTitle && ch) {
     screenFooterTitle.textContent = `CH ${ch.id} · ${ch.title.toUpperCase()}`;
   }
 }
@@ -1679,6 +2007,7 @@ function openMathLabById(chId) {
 
 function closeMathLab() {
   labOpen = false;
+  stopCurveSonifier();
   if (mathLabOverlay) mathLabOverlay.hidden = true;
   if (screenFooterTitle) screenFooterTitle.textContent = "MATH_LAND 3D";
 }
@@ -1743,6 +2072,9 @@ function applyLabPointer(e, isClick) {
   const nx = (e.clientX - rect.left) / rect.width;
   const ny = (e.clientY - rect.top) / rect.height;
   const ch = MATH_CHAPTERS[activeChapterIdx];
+  if (ch.id === "20") {
+    labExtras.traceX = Number(((nx - 0.5) * (8 / Math.max(0.5, labExtras.zoom))).toFixed(2));
+  }
   const next = mapCanvasPointerToParams(ch.id, nx, ny, labP1, labP2, ch, isClick);
   applyLabParams(next.p1, next.p2);
 }
@@ -1769,6 +2101,15 @@ if (mathLabCanvas) {
   };
   mathLabCanvas.addEventListener("pointerup", endLabPointer);
   mathLabCanvas.addEventListener("pointercancel", endLabPointer);
+  mathLabCanvas.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.15 : 0.15;
+      labExtras.zoom = Math.max(0.5, Math.min(2.6, Number((labExtras.zoom + delta).toFixed(2))));
+    },
+    { passive: false },
+  );
 }
 
 mlPlayBtn?.addEventListener("click", () => {
@@ -1799,8 +2140,307 @@ mlRandBtn?.addEventListener("click", () => {
 mlResetBtn?.addEventListener("click", () => {
   const ch = MATH_CHAPTERS[activeChapterIdx];
   playBlip(460);
+  labExtras.zoom = 1;
+  labExtras.panX = 0;
+  labExtras.panY = 0;
+  labExtras.traceX = 0.85;
   applyLabParams(ch.p1Default, ch.p2Default);
-  showToast(`Reset Ch.${ch.id} sliders to default`, 2200);
+  showToast(`Reset Ch.${ch.id} sliders & zoom to default`, 2200);
+});
+
+mlThemeBtn?.addEventListener("click", () => {
+  labExtras.theme = labExtras.theme === "paper" ? "dark" : "paper";
+  mlThemeBtn.classList.toggle("is-active", labExtras.theme === "paper");
+  mlThemeBtn.textContent = labExtras.theme === "paper" ? "DARK" : "PAPER";
+});
+
+function runProbabilityBatch(runs = 25) {
+  const n = Math.max(4, Math.round(labP2));
+  const p = Math.max(0.05, Math.min(0.95, labP1));
+  if (labExtras.expTrials.n !== n || Math.abs(labExtras.expTrials.p - p) > 0.02 || labExtras.expTrials.counts.length !== n + 1) {
+    labExtras.expTrials = { n, p, counts: Array(n + 1).fill(0), totalRuns: 0 };
+  }
+  for (let r = 0; r < runs; r++) {
+    let k = 0;
+    for (let i = 0; i < n; i++) {
+      if (Math.random() < p) k++;
+    }
+    labExtras.expTrials.counts[k] = (labExtras.expTrials.counts[k] || 0) + 1;
+    labExtras.expTrials.totalRuns++;
+  }
+}
+
+mlExpModeBtn?.addEventListener("click", () => {
+  const ch = MATH_CHAPTERS[activeChapterIdx];
+  labExtras.expMode = !labExtras.expMode;
+  mlExpModeBtn.classList.toggle("is-active", labExtras.expMode);
+  playBlip(labExtras.expMode ? 680 : 480);
+  if (labExtras.expMode && ch?.id === "06" && labExtras.expTrials.totalRuns === 0) {
+    runProbabilityBatch(25);
+  }
+  if (labExtras.expMode) {
+    showToast(`Experiment Mode: ${ch?.experimentTitle || ch?.title}`, 2600);
+  }
+});
+
+mlExpActionBtn?.addEventListener("click", () => {
+  const ch = MATH_CHAPTERS[activeChapterIdx];
+  if (!ch) return;
+  labExtras.expMode = true;
+  mlExpModeBtn?.classList.add("is-active");
+  playConfirm();
+  completeQuest("run_experiment");
+  if (ch.id === "B1") {
+    labExtras.expBusStops += 1;
+    const nextB = Math.min(ch.p2Max, Math.round(labP2) + 1);
+    applyLabParams(labP1, nextB > ch.p2Max ? 1 : nextB);
+  } else if (ch.id === "B2") {
+    const b = Math.max(2, Math.round(labP2));
+    const nextA = (Math.round(labP1) % b) + 1;
+    applyLabParams(nextA, b);
+  } else if (ch.id === "B3") {
+    labExtras.expCartItems = (labExtras.expCartItems % 6) + 1;
+    showToast(`Scanned item #${labExtras.expCartItems} into Supermarket Receipt!`, 2000);
+  } else if (ch.id === "B4") {
+    const a = Math.max(1, Math.round(labP1));
+    const exactX = Number(Math.min(ch.p2Max, 8 / a).toFixed(1));
+    applyLabParams(a, exactX);
+    showToast(`Solved ${a}x + 2 = 10 -> x = ${exactX}!`, 2400);
+  } else if (ch.id === "B5") {
+    const nextL = Math.round(labP1) >= ch.p1Max ? ch.p1Min : Math.round(labP1) + 1;
+    applyLabParams(nextL, labP2);
+  } else if (ch.id === "06") {
+    runProbabilityBatch(25);
+    showToast(`Rolled 25 live trials (total ${labExtras.expTrials.totalRuns})!`, 2200);
+  } else if (ch.id === "07") {
+    const nextP1 = Number((labP1 + 0.5 > ch.p1Max ? ch.p1Min : labP1 + 0.5).toFixed(2));
+    applyLabParams(nextP1, labP2);
+  } else if (ch.id === "14") {
+    labSimTime = 0;
+    applyLabParams(labP1, Math.min(ch.p2Max, Math.max(1.5, labP2 + 0.3)));
+  } else {
+    labSimTime += 0.45;
+  }
+});
+
+mlTangentBtn?.addEventListener("click", () => {
+  labExtras.showTangent = !labExtras.showTangent;
+  mlTangentBtn.classList.toggle("is-active", labExtras.showTangent);
+});
+
+mlIntegralBtn?.addEventListener("click", () => {
+  labExtras.showIntegral = !labExtras.showIntegral;
+  mlIntegralBtn.classList.toggle("is-active", labExtras.showIntegral);
+});
+
+mlPolarBtn?.addEventListener("click", () => {
+  labExtras.polarMode = !labExtras.polarMode;
+  mlPolarBtn.classList.toggle("is-active", labExtras.polarMode);
+});
+
+mlZoomInBtn?.addEventListener("click", () => {
+  labExtras.zoom = Math.min(2.6, Number((labExtras.zoom + 0.2).toFixed(2)));
+});
+
+mlZoomOutBtn?.addEventListener("click", () => {
+  labExtras.zoom = Math.max(0.5, Number((labExtras.zoom - 0.2).toFixed(2)));
+});
+
+mlSnapBtn?.addEventListener("click", () => {
+  if (!mathLabCanvas) return;
+  const ch = MATH_CHAPTERS[activeChapterIdx];
+  const a = document.createElement("a");
+  a.download = `math_land_ch_${ch.id}.png`;
+  a.href = mathLabCanvas.toDataURL("image/png");
+  a.click();
+  playConfirm();
+  showToast(`Saved PNG snapshot for Ch.${ch.id}`, 2400);
+});
+
+mlExprAInput?.addEventListener("input", () => {
+  labExtras.exprA = mlExprAInput.value || "p1 * sin(x) + p2 * 0.4";
+});
+
+mlExprBInput?.addEventListener("input", () => {
+  labExtras.exprB = mlExprBInput.value || "";
+});
+
+// Live Web Audio Curve Sonifier
+let sonifyCtx = null;
+let sonifyOsc = null;
+let sonifyGain = null;
+let sonifyTimer = null;
+let sonifyOn = false;
+
+function stopCurveSonifier() {
+  sonifyOn = false;
+  if (sonifyTimer) {
+    clearInterval(sonifyTimer);
+    sonifyTimer = null;
+  }
+  if (sonifyGain && sonifyCtx) {
+    try {
+      sonifyGain.gain.setTargetAtTime(0, sonifyCtx.currentTime, 0.03);
+    } catch {
+      // Ignore audio teardown errors
+    }
+  }
+  mlSonifyBtn?.classList.remove("is-active");
+  if (mlSonifyBtn) mlSonifyBtn.textContent = "AUDIO";
+}
+
+function toggleCurveSonifier() {
+  if (sonifyOn) {
+    stopCurveSonifier();
+    return;
+  }
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) {
+    showToast("Web Audio unavailable on this browser", 2400);
+    return;
+  }
+  if (!sonifyCtx) sonifyCtx = new AudioCtx();
+  if (sonifyCtx.state === "suspended") void sonifyCtx.resume();
+  if (!sonifyOsc) {
+    sonifyOsc = sonifyCtx.createOscillator();
+    sonifyGain = sonifyCtx.createGain();
+    sonifyOsc.type = "triangle";
+    sonifyGain.gain.value = 0;
+    sonifyOsc.connect(sonifyGain);
+    sonifyGain.connect(sonifyCtx.destination);
+    sonifyOsc.start();
+  }
+  sonifyOn = true;
+  mlSonifyBtn?.classList.add("is-active");
+  if (mlSonifyBtn) mlSonifyBtn.textContent = "MUTE";
+  sonifyGain.gain.setTargetAtTime(0.065, sonifyCtx.currentTime, 0.04);
+  let phase = 0;
+  sonifyTimer = setInterval(() => {
+    if (!sonifyOn || !labOpen || !consolePower || consolePaused) {
+      stopCurveSonifier();
+      return;
+    }
+    phase += 0.25;
+    const ch = MATH_CHAPTERS[activeChapterIdx];
+    const s = sampleCurveAudioValue(ch.id, labP1, labP2, phase, labExtras);
+    const freq = Math.max(130, Math.min(880, 330 + s * 180));
+    sonifyOsc.frequency.setTargetAtTime(freq, sonifyCtx.currentTime, 0.03);
+  }, 60);
+}
+
+mlSonifyBtn?.addEventListener("click", toggleCurveSonifier);
+
+// Gemini AI Math Tutor & Spoken TTS Audio Player
+let activeTtsAudio = null;
+
+async function speakWithGeminiTts(rawText, triggerBtn) {
+  const cleanText = String(rawText || "").trim();
+  if (!cleanText) return;
+  if (activeTtsAudio) {
+    try {
+      activeTtsAudio.pause();
+    } catch {
+      // Ignore
+    }
+    activeTtsAudio = null;
+  }
+  const origLabel = triggerBtn ? triggerBtn.textContent : "";
+  if (triggerBtn) {
+    triggerBtn.disabled = true;
+    triggerBtn.textContent = "LOADING...";
+  }
+  try {
+    const ttsMode = mlTtsEngineSelect?.value || "auto";
+    const res = await fetch("/api/gemini/tts", {
+      method: "POST",
+      headers: buildVisitorHeaders({
+        "content-type": "application/json",
+        "x-meadow-client": "1",
+      }),
+      body: JSON.stringify({ text: cleanText, voiceName: "Kore", ttsMode }),
+    });
+    const data = await res.json();
+    if (res.ok && data?.ok && data?.audioBase64) {
+      const mime = data.mimeType || "audio/wav";
+      activeTtsAudio = new Audio(`data:${mime};base64,${data.audioBase64}`);
+      await activeTtsAudio.play();
+      completeQuest("listen_tts");
+      return;
+    }
+    throw new Error(data?.error || "TTS unavailable");
+  } catch {
+    if (typeof window.speechSynthesis !== "undefined") {
+      const u = new SpeechSynthesisUtterance(cleanText);
+      u.rate = 1.02;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+      completeQuest("listen_tts");
+    } else {
+      showToast("Voice narration unavailable right now.", 2400);
+    }
+  } finally {
+    if (triggerBtn) {
+      triggerBtn.disabled = false;
+      triggerBtn.textContent = origLabel;
+    }
+  }
+}
+
+async function askGeminiTutor() {
+  const ch = MATH_CHAPTERS[activeChapterIdx];
+  if (!ch || !mlTutorAnswerEl) return;
+  const question = mlTutorInput?.value?.trim() || "";
+  const modelPref = mlTutorModelSelect?.value || "gemini-2.5-flash";
+  if (mlTutorAskBtn) mlTutorAskBtn.disabled = true;
+  mlTutorAnswerEl.textContent = `Thinking with ${modelPref}...`;
+  try {
+    const res = await fetch("/api/gemini/explain", {
+      method: "POST",
+      headers: buildVisitorHeaders({
+        "content-type": "application/json",
+        "x-meadow-client": "1",
+      }),
+      body: JSON.stringify({
+        chapterTitle: `Ch.${ch.id}: ${ch.title} (${ch.cbseClass || "CBSE"})`,
+        formulaSummary: getStepByStepBreakdown(ch.id, labP1, labP2, labExtras),
+        readout: mlReadoutEl?.textContent || ch.labTitle,
+        question,
+        modelPref,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.ok) {
+      mlTutorAnswerEl.textContent = data?.error || "Could not reach Gemini Tutor right now.";
+      return;
+    }
+    const parts = [data.explanation];
+    if (data.keyFormula) parts.push(`Formula: ${data.keyFormula}`);
+    if (data.tryTip) parts.push(`Try: ${data.tryTip}`);
+    if (data.modelUsed) parts.push(`[${data.modelUsed}]`);
+    mlTutorAnswerEl.textContent = parts.filter(Boolean).join(" · ");
+    completeQuest("ask_gemini");
+  } catch {
+    mlTutorAnswerEl.textContent = "Network hiccup reaching Gemini Tutor.";
+  } finally {
+    if (mlTutorAskBtn) mlTutorAskBtn.disabled = false;
+  }
+}
+
+mlTutorAskBtn?.addEventListener("click", () => void askGeminiTutor());
+mlTutorInput?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    void askGeminiTutor();
+  }
+});
+mlTutorSpeakBtn?.addEventListener("click", () => {
+  const ch = MATH_CHAPTERS[activeChapterIdx];
+  const ans = mlTutorAnswerEl?.textContent || "";
+  const speechText =
+    ans && !ans.startsWith("Click ASK") && !ans.startsWith("Thinking")
+      ? ans
+      : `${ch.title}. ${getStepByStepBreakdown(ch.id, labP1, labP2, labExtras)}`;
+  void speakWithGeminiTts(speechText, mlTutorSpeakBtn);
 });
 
 const SKY_MODES = ["day", "sunset", "night"];
@@ -1992,6 +2632,15 @@ ml3dBtn?.addEventListener("click", () => {
 
 document.getElementById("arcade-hop-btn")?.addEventListener("click", hopNextWorldAttraction);
 document.getElementById("bezel-toys-btn")?.addEventListener("click", hopNextWorldAttraction);
+document.getElementById("bezel-quests-btn")?.addEventListener("click", openQuestDialog);
+document.getElementById("quest-hud-btn")?.addEventListener("click", openQuestDialog);
+document.getElementById("house-hop-btn")?.addEventListener("click", () => {
+  visitWorldAttraction({ id: "math-house-clubhouse", label: "Cozy House & Quests", desc: "Walk inside for Quest Book, 4-Ch TV & Honey Tea" });
+});
+document.getElementById("pause-quests-btn")?.addEventListener("click", () => {
+  setConsolePaused(false);
+  openQuestDialog();
+});
 document.getElementById("bezel-labs-btn")?.addEventListener("click", () => {
   if (labOpen) closeMathLab();
   else openMathLabByIndex(activeChapterIdx);
@@ -2031,6 +2680,7 @@ document.getElementById("pause-dev-btn")?.addEventListener("click", () => {
   setConsolePaused(false);
   arcadeHopIdx = 0;
   visitWorldAttraction(WORLD_ATTRACTIONS[0]);
+  completeQuest("visit_dev_hq");
 });
 document.getElementById("pause-add-btn")?.addEventListener("click", () => {
   setConsolePaused(false);
@@ -2045,6 +2695,70 @@ document.getElementById("pause-expand-btn")?.addEventListener("click", () => {
   setConsolePaused(false);
   toggleExpandedScreen();
 });
+
+// Touch Camera Rotation Pad (Mobile / Tablet / Desktop pointer hold)
+const rotHold = { yaw: 0, pitch: 0 };
+let rotRafId = null;
+function stepRotateHold() {
+  if (!rotHold.yaw && !rotHold.pitch) {
+    rotRafId = null;
+    return;
+  }
+  engine?.rotateLook?.(rotHold.yaw * 0.042, rotHold.pitch * 0.032);
+  rotRafId = requestAnimationFrame(stepRotateHold);
+}
+function bindRotateBtn(btnId, dyaw, dpitch) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  const stopRot = () => {
+    btn.classList.remove("is-pressed");
+    rotHold.yaw = 0;
+    rotHold.pitch = 0;
+  };
+  btn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    stopWorldTour(false);
+    btn.classList.add("is-pressed");
+    rotHold.yaw = dyaw;
+    rotHold.pitch = dpitch;
+    if (!rotRafId) rotRafId = requestAnimationFrame(stepRotateHold);
+  });
+  ["pointerup", "pointercancel", "pointerleave"].forEach((ev) => btn.addEventListener(ev, stopRot));
+}
+bindRotateBtn("rot-left-btn", 1, 0);
+bindRotateBtn("rot-right-btn", -1, 0);
+bindRotateBtn("rot-up-btn", 0, 1);
+bindRotateBtn("rot-down-btn", 0, -1);
+
+// Car Driving HUD & Express Train HUD controls
+const driveAssist = { throttle: 0, steer: 0, turbo: false };
+function bindDriveHold(el, patchOn, patchOff) {
+  if (!el) return;
+  el.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    Object.assign(driveAssist, patchOn);
+    engine?.setDriveAssist?.(driveAssist);
+  });
+  const release = () => {
+    Object.assign(driveAssist, patchOff);
+    engine?.setDriveAssist?.(driveAssist);
+  };
+  ["pointerup", "pointercancel", "pointerleave"].forEach((ev) => el.addEventListener(ev, release));
+}
+bindDriveHold(driveGasBtn, { throttle: 1 }, { throttle: 0 });
+bindDriveHold(driveBrakeBtn, { throttle: -1 }, { throttle: 0 });
+bindDriveHold(driveLeftBtn, { steer: 1 }, { steer: 0 });
+bindDriveHold(driveRightBtn, { steer: -1 }, { steer: 0 });
+bindDriveHold(driveTurboBtn, { turbo: true }, { turbo: false });
+driveHornBtn?.addEventListener("click", () => engine?.blowVehicleHorn?.());
+driveExitBtn?.addEventListener("click", () => engine?.exitCarDrive?.());
+trainWhistleBtn?.addEventListener("click", () => {
+  engine?.blowVehicleHorn?.();
+  showToast("CHOO-CHOO! MATH_LAND Express rolling along the island rail loop!", 2800);
+});
+trainExitBtn?.addEventListener("click", () => engine?.hopOffCurrentVehicle?.());
 
 function handleConsoleA() {
   if (!consolePower || consolePaused) return;
@@ -2155,7 +2869,7 @@ const keyToDpad = {
 };
 window.addEventListener("keydown", (e) => {
   const tag = e.target?.tagName?.toLowerCase();
-  if (tag === "textarea" || tag === "input" || document.querySelector("dialog[open]")) return;
+  if (tag === "textarea" || tag === "input" || tag === "select" || document.querySelector("dialog[open]")) return;
   const lk = e.key ? String(e.key).toLowerCase() : "";
   if (keyToDpad[lk] && consolePower && !consolePaused) {
     dpadBtns[keyToDpad[lk]]?.classList.add("is-pressed");
@@ -2233,10 +2947,13 @@ function stepMathLabCanvas(now) {
     labP1,
     labP2,
     labSimTime,
-    { missionSolved: missionRes.solved },
+    { ...labExtras, missionSolved: missionRes.solved },
   );
   if (mlReadoutEl && readout) {
     mlReadoutEl.textContent = readout;
+  }
+  if (mlStepsBox) {
+    mlStepsBox.textContent = getStepByStepBreakdown(ch.id, labP1, labP2, labExtras);
   }
 }
 

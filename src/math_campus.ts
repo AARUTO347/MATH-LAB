@@ -12,6 +12,7 @@ export interface MathMonumentSpec {
   preferredX: number;
   preferredZ: number;
   scaleClass: ScaleClass;
+  category?: WorldCreation["category"];
   accentColor: string;
   secondaryColor: string;
   interactionKind?: InteractionKind;
@@ -36,15 +37,25 @@ export interface MathMonumentSpec {
     | "bell_arch"
     | "logic_gate"
     | "venn_rings"
+    | "graph_studio"
     | "dev_hq"
+    | "cozy_house"
     | "flat_stage"
     | "marble_tower"
     | "tesla_spire"
     | "gravity_cube"
     | "parabolic_hoop"
     | "turbo_roadster"
+    | "rally_coupe"
+    | "dune_buggy"
     | "express_train"
-    | "train_station";
+    | "train_station"
+    | "abacus_frame"
+    | "fraction_stand"
+    | "balance_scale"
+    | "pendulum_tower"
+    | "rocket_pad"
+    | "ferris_wheel";
   behavior?: WorldCreation["behavior"];
 }
 
@@ -468,15 +479,51 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
     motif: "parabolic_hoop",
   },
   {
+    chapterNum: "20",
+    id: "math-ch-20",
+    name: "Ch.20 Graphing Studio Tower",
+    description:
+      "Interactive Cartesian & Polar 3D function plotter spire with glowing tangent prism and Riemann accumulator!",
+    statusLine: "Inspect Ch.20 Graphing Studio Lab",
+    preferredX: 28,
+    preferredZ: -44,
+    scaleClass: "medium",
+    accentColor: "cyan",
+    secondaryColor: "magenta",
+    motif: "graph_studio",
+  },
+  {
+    chapterNum: "HSE",
+    id: "math-house-clubhouse",
+    name: "MATH_LAND Cozy House",
+    description:
+      "Enterable manor house by AARUTO + DIPU-_-! Walk inside [E] for the Quest Book, Live 4-Channel TV, Copper Tea Kettle & Fireplace.",
+    statusLine: "Enter Cozy House · Press E for Quest Book & TV",
+    preferredX: -14.5,
+    preferredZ: -16.5,
+    scaleClass: "medium",
+    category: "building",
+    accentColor: "crimson",
+    secondaryColor: "gold",
+    motif: "cozy_house",
+    behavior: {
+      type: "landmark",
+      facingYaw: 0,
+      activity: "Cozy Manor · Quest Book, Live TV & Tea Inside",
+      statusLine: "Walk to door & press E to enter Quest Book, TV & Fireplace!",
+    },
+  },
+  {
     chapterNum: "CAR",
     id: "math-turbo-roadster",
     name: "Pixel Turbo Roadster Car",
     description:
-      "Drivable crimson & gold voxel sports roadster built for MATH_LAND by AARUTO + DIPU-_-. Press E or click DRIVE CAR to steer with WASD, Shift Turbo & H Horn!",
+      "Drivable crimson & gold voxel sports roadster built for MATH_LAND by AARUTO + DIPU-_-. Press E or click CAR to steer with WASD, Shift Turbo & H Horn!",
     statusLine: "Ready to Drive · Press E or Click CAR",
     preferredX: 11.5,
     preferredZ: -10.5,
     scaleClass: "medium",
+    category: "vehicle",
     accentColor: "red",
     secondaryColor: "gold",
     motif: "turbo_roadster",
@@ -485,6 +532,48 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
       facingYaw: 0.35,
       activity: "Parked · Ready to Drive!",
       statusLine: "Press E or click CAR to drive around MATH_LAND!",
+    },
+  },
+  {
+    chapterNum: "CAR",
+    id: "math-rally-coupe",
+    name: "Cobalt Rally Coupe Car",
+    description:
+      "Drivable azure & cream rally coupe parked near MATH_LAND Cozy House. Press E to hop in and drift the ring road!",
+    statusLine: "Ready to Drive · Cobalt Rally Coupe",
+    preferredX: -11.5,
+    preferredZ: -25.5,
+    scaleClass: "medium",
+    category: "vehicle",
+    accentColor: "blue",
+    secondaryColor: "cream",
+    motif: "rally_coupe",
+    behavior: {
+      type: "landmark",
+      facingYaw: 1.57,
+      activity: "Parked by Cozy House · Ready to Drive!",
+      statusLine: "Press E to drive the Cobalt Rally Coupe!",
+    },
+  },
+  {
+    chapterNum: "CAR",
+    id: "math-dune-buggy",
+    name: "Solar Dune Buggy Car",
+    description:
+      "Drivable sunburst yellow & orange voxel buggy with roll-cage & off-road wheels. Press E to cruise MATH_LAND!",
+    statusLine: "Ready to Drive · Solar Dune Buggy",
+    preferredX: 26.5,
+    preferredZ: 24.5,
+    scaleClass: "medium",
+    category: "vehicle",
+    accentColor: "amber",
+    secondaryColor: "orange",
+    motif: "dune_buggy",
+    behavior: {
+      type: "landmark",
+      facingYaw: -0.78,
+      activity: "Parked by South Promenade · Ready to Drive!",
+      statusLine: "Press E to drive the Solar Dune Buggy!",
     },
   },
   {
@@ -537,6 +626,96 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
     accentColor: "brick",
     secondaryColor: "gold",
     motif: "train_station",
+  },
+  {
+    chapterNum: "BAS",
+    id: "math-park-abacus",
+    name: "Basic Park Giant Abacus",
+    description:
+      "Class 1-5 Basic Math Park 3D Abacus frame with colorful sliding place-value beads (1s, 10s, 100s). Click to count beads!",
+    statusLine: "Basic Math Park · Click Abacus Beads to Count!",
+    preferredX: -34,
+    preferredZ: 32,
+    scaleClass: "medium",
+    accentColor: "gold",
+    secondaryColor: "cyan",
+    interactionKind: "abacus_frame",
+    motif: "abacus_frame",
+  },
+  {
+    chapterNum: "BAS",
+    id: "math-park-fraction",
+    name: "Fraction Pizza Market Stand",
+    description:
+      "Class 1-6 Fractions & Decimals kiosk by AARUTO + DIPU-_-. Click to slice the giant glowing pizza into halves, quarters & eighths!",
+    statusLine: "Basic Math Park · Click Stand to Slice Fractions!",
+    preferredX: -46,
+    preferredZ: 22,
+    scaleClass: "medium",
+    accentColor: "orange",
+    secondaryColor: "crimson",
+    interactionKind: "fraction_stand",
+    motif: "fraction_stand",
+  },
+  {
+    chapterNum: "BAS",
+    id: "math-park-scale",
+    name: "Algebra Balance Scale Plaza",
+    description:
+      "Class 6-8 Linear Equations Balance Scale monument. Click to test ax + b = c weights and watch the golden beam tip!",
+    statusLine: "Basic Math Park · Click Scale to Balance Equations!",
+    preferredX: -22,
+    preferredZ: 42,
+    scaleClass: "medium",
+    accentColor: "amber",
+    secondaryColor: "emerald",
+    interactionKind: "balance_scale",
+    motif: "balance_scale",
+  },
+  {
+    chapterNum: "EXP",
+    id: "math-exp-pendulum",
+    name: "Galileo Pendulum Clock Tower",
+    description:
+      "Experiment Yard physics tower demonstrating SHM period T = 2π√(L/g) and trigonometric oscillation!",
+    statusLine: "Experiment Yard · Click Pendulum to Boost Swing!",
+    preferredX: 36,
+    preferredZ: 20,
+    scaleClass: "medium",
+    accentColor: "cyan",
+    secondaryColor: "gold",
+    interactionKind: "pendulum_tower",
+    motif: "pendulum_tower",
+  },
+  {
+    chapterNum: "EXP",
+    id: "math-exp-rocket",
+    name: "Kinematics Rocket Launch Pad",
+    description:
+      "CBSE Projectile & Calculus Launch Pad. Click or press E to ignite the voxel rocket stage and trace thrust!",
+    statusLine: "Experiment Yard · Click Pad to Ignite Rocket!",
+    preferredX: 48,
+    preferredZ: 10,
+    scaleClass: "medium",
+    accentColor: "red",
+    secondaryColor: "amber",
+    interactionKind: "rocket_pad",
+    motif: "rocket_pad",
+  },
+  {
+    chapterNum: "EXP",
+    id: "math-exp-wheel",
+    name: "Sine Wave Ferris Wheel",
+    description:
+      "Rotating Experiment Yard Ferris Wheel demonstrating periodic height y(t) = R·sin(ωt) + h across colorful cabins!",
+    statusLine: "Experiment Yard · Click Wheel to Shift Speed!",
+    preferredX: 42,
+    preferredZ: -4,
+    scaleClass: "large",
+    accentColor: "magenta",
+    secondaryColor: "gold",
+    interactionKind: "ferris_wheel",
+    motif: "ferris_wheel",
   },
 ];
 
@@ -955,12 +1134,14 @@ function buildMotifBlueprint(spec: MathMonumentSpec): VoxelBlueprint {
         { op: "box", x0: -3, y0: 2, z0: 8, x1: -2, y1: 3, z1: 8, color: "warmGlow", emit: 1.5, mirrorX: true },
         { op: "box", x0: -3, y0: 2, z0: -8, x1: -2, y1: 3, z1: -8, color: "magenta", emit: 1.3, mirrorX: true },
       );
-      [
-        [-4, 5, "wheel-fl"],
-        [4, 5, "wheel-fr"],
-        [-4, -5, "wheel-rl"],
-        [4, -5, "wheel-rr"],
-      ].forEach(([wx, wz, wName]) => {
+      (
+        [
+          [-4, 5, "wheel-fl"],
+          [4, 5, "wheel-fr"],
+          [-4, -5, "wheel-rl"],
+          [4, -5, "wheel-rr"],
+        ] as const
+      ).forEach(([wx, wz, wName]) => {
         parts.push({
           name: wName,
           kind: "wheel",
@@ -998,16 +1179,18 @@ function buildMotifBlueprint(spec: MathMonumentSpec): VoxelBlueprint {
         { op: "box", x0: -4, y0: 5, z0: -6, x1: -4, y1: 7, z1: -4, color: "warmGlow", emit: 1.2, mirrorX: true },
         { op: "box", x0: -3, y0: 3, z0: -12, x1: 3, y1: 4, z1: -12, color: "red", emit: 1.2 },
       );
-      [
-        [-4, 7, "loco-wheel-fl"],
-        [4, 7, "loco-wheel-fr"],
-        [-4, 2, "loco-wheel-ml"],
-        [4, 2, "loco-wheel-mr"],
-        [-4, -5, "coach-wheel-fl"],
-        [4, -5, "coach-wheel-fr"],
-        [-4, -10, "coach-wheel-rl"],
-        [4, -10, "coach-wheel-rr"],
-      ].forEach(([wx, wz, wName]) => {
+      (
+        [
+          [-4, 7, "loco-wheel-fl"],
+          [4, 7, "loco-wheel-fr"],
+          [-4, 2, "loco-wheel-ml"],
+          [4, 2, "loco-wheel-mr"],
+          [-4, -5, "coach-wheel-fl"],
+          [4, -5, "coach-wheel-fr"],
+          [-4, -10, "coach-wheel-rl"],
+          [4, -10, "coach-wheel-rr"],
+        ] as const
+      ).forEach(([wx, wz, wName]) => {
         parts.push({
           name: wName,
           kind: "wheel",
@@ -1036,6 +1219,235 @@ function buildMotifBlueprint(spec: MathMonumentSpec): VoxelBlueprint {
         ops: [{ op: "box", x0: -1, y0: 0, z0: -1, x1: 1, y1: 1, z1: 1, color: "gold", emit: 1.5 }],
       });
       break;
+    case "graph_studio":
+      ops.push(
+        { op: "box", x0: -4, y0: 2, z0: 0, x1: 4, y1: 10, z1: 0, color: "slate" },
+        { op: "box", x0: -4, y0: 6, z0: -1, x1: 4, y1: 6, z1: 1, color: "white", emit: 0.5 },
+        { op: "box", x0: 0, y0: 2, z0: -1, x1: 0, y1: 11, z1: 1, color: "white", emit: 0.5 },
+        { op: "box", x0: -4, y0: 4, z0: 1, x1: -2, y1: 6, z1: 1, color: c1, emit: 1.4 },
+        { op: "box", x0: -2, y0: 6, z0: 1, x1: 0, y1: 9, z1: 1, color: c1, emit: 1.5 },
+        { op: "box", x0: 0, y0: 7, z0: 1, x1: 2, y1: 9, z1: 1, color: c2, emit: 1.4 },
+        { op: "box", x0: 2, y0: 4, z0: 1, x1: 4, y1: 7, z1: 1, color: c2, emit: 1.4 },
+      );
+      parts.push({
+        name: "graph-orbiter",
+        kind: "spinY",
+        speed: 1.35,
+        pivot: [0, 12.5, 0],
+        ops: [
+          { op: "box", x0: -3, y0: 0, z0: -1, x1: 3, y1: 1, z1: 1, color: c1, emit: 1.5 },
+          { op: "box", x0: -1, y0: -1, z0: -3, x1: 1, y1: 1, z1: 3, color: "gold", emit: 1.4 },
+        ],
+      });
+      break;
+    case "cozy_house":
+      ops.length = 0;
+      ops.push(
+        // Stone foundation & front doorstep
+        { op: "box", x0: -6, y0: 0, z0: -6, x1: 6, y1: 1, z1: 6, color: "stone" },
+        { op: "box", x0: -2, y0: 0, z0: 6, x1: 2, y1: 1, z1: 7, color: "marble" },
+        // Cream timber-framed walls & cozy brick corners
+        { op: "box", x0: -5, y0: 1, z0: -5, x1: 5, y1: 8, z1: 5, color: "cream" },
+        { op: "box", x0: -5, y0: 1, z0: -5, x1: -4, y1: 8, z1: -4, color: "woodDark", mirrorX: true },
+        { op: "box", x0: -5, y0: 1, z0: 4, x1: -4, y1: 8, z1: 5, color: "woodDark", mirrorX: true },
+        // Arched front door (z = +5) & glowing windows
+        { op: "box", x0: -2, y0: 1, z0: 5, x1: 2, y1: 6, z1: 5, color: "oak" },
+        { op: "box", x0: -1, y0: 2, z0: 5, x1: 1, y1: 5, z1: 5, color: "amber", emit: 0.7 },
+        { op: "box", x0: -4, y0: 4, z0: 5, x1: -3, y1: 6, z1: 5, color: "warmGlow", emit: 1.4, mirrorX: true },
+        { op: "box", x0: -5, y0: 4, z0: -2, x1: -5, y1: 6, z1: 1, color: "warmGlow", emit: 1.2, mirrorX: true },
+        // Pitched crimson shingle roof & chimney
+        { op: "box", x0: -6, y0: 8, z0: -6, x1: 6, y1: 9, z1: 6, color: "crimson" },
+        { op: "box", x0: -5, y0: 9, z0: -5, x1: 5, y1: 11, z1: 5, color: "crimson" },
+        { op: "box", x0: -3, y0: 11, z0: -3, x1: 3, y1: 13, z1: 3, color: "red" },
+        { op: "box", x0: 2, y0: 9, z0: -4, x1: 4, y1: 15, z1: -2, color: "brick" },
+        // Porch lantern
+        { op: "box", x0: -1, y0: 7, z0: 6, x1: 1, y1: 8, z1: 6, color: "gold", emit: 1.5 },
+      );
+      parts.push({
+        name: "house-smoke",
+        kind: "bob",
+        speed: 1.2,
+        amp: 0.55,
+        pivot: [3, 16.5, -3],
+        ops: [{ op: "sphere", cx: 0, cy: 0, cz: 0, rx: 1.3, ry: 1.1, rz: 1.3, color: "white", emit: 0.4 }],
+      });
+      break;
+    case "rally_coupe":
+      ops.length = 0;
+      ops.push(
+        { op: "box", x0: -4, y0: 1, z0: -8, x1: 4, y1: 3, z1: 8, color: "blue" },
+        { op: "box", x0: -1, y0: 3, z0: -7, x1: 1, y1: 4, z1: 8, color: "cream" },
+        { op: "box", x0: -3, y0: 3, z0: -4, x1: 3, y1: 7, z1: 2, color: "blueDark" },
+        { op: "box", x0: -2, y0: 4, z0: 2, x1: 2, y1: 6, z1: 3, color: "glass", emit: 0.5 },
+        { op: "box", x0: -4, y0: 5, z0: -8, x1: 4, y1: 6, z1: -7, color: "cream" },
+        { op: "box", x0: -3, y0: 2, z0: 8, x1: -2, y1: 3, z1: 8, color: "warmGlow", emit: 1.5, mirrorX: true },
+        { op: "box", x0: -3, y0: 2, z0: -8, x1: -2, y1: 3, z1: -8, color: "red", emit: 1.3, mirrorX: true },
+      );
+      (
+        [
+          [-4, 5, "wheel-fl"],
+          [4, 5, "wheel-fr"],
+          [-4, -5, "wheel-rl"],
+          [4, -5, "wheel-rr"],
+        ] as const
+      ).forEach(([wx, wz, wName]) => {
+        parts.push({
+          name: wName,
+          kind: "wheel",
+          speed: 1.0,
+          pivot: [wx, 2, wz],
+          ops: [
+            { op: "cylinder", axis: "x", cy: 0, cz: 0, x0: -1, x1: 1, radius: 2.0, color: "rubber" },
+            { op: "box", x0: -1, y0: -1, z0: -1, x1: 1, y1: 1, z1: 1, color: "gold" },
+          ],
+        });
+      });
+      break;
+    case "dune_buggy":
+      ops.length = 0;
+      ops.push(
+        { op: "box", x0: -4, y0: 2, z0: -7, x1: 4, y1: 3, z1: 7, color: "orange" },
+        { op: "box", x0: -3, y0: 3, z0: 1, x1: 3, y1: 4, z1: 7, color: "amber" },
+        { op: "box", x0: -3, y0: 3, z0: -5, x1: -2, y1: 7, z1: 2, color: "charcoal", mirrorX: true },
+        { op: "box", x0: -3, y0: 7, z0: -5, x1: 3, y1: 8, z1: 1, color: "amber" },
+        { op: "box", x0: -2, y0: 3, z0: -6, x1: 2, y1: 5, z1: -4, color: "iron" },
+        { op: "box", x0: -2, y0: 4, z0: 7, x1: -1, y1: 5, z1: 7, color: "warmGlow", emit: 1.6, mirrorX: true },
+      );
+      (
+        [
+          [-4, 5, "wheel-fl"],
+          [4, 5, "wheel-fr"],
+          [-4, -5, "wheel-rl"],
+          [4, -5, "wheel-rr"],
+        ] as const
+      ).forEach(([wx, wz, wName]) => {
+        parts.push({
+          name: wName,
+          kind: "wheel",
+          speed: 1.0,
+          pivot: [wx, 2, wz],
+          ops: [
+            { op: "cylinder", axis: "x", cy: 0, cz: 0, x0: -1, x1: 1, radius: 2.2, color: "rubber" },
+            { op: "box", x0: -1, y0: -1, z0: -1, x1: 1, y1: 1, z1: 1, color: "orange" },
+          ],
+        });
+      });
+      break;
+    case "abacus_frame":
+      ops.push(
+        { op: "box", x0: -5, y0: 2, z0: -1, x1: -4, y1: 11, z1: 1, color: "woodDark", mirrorX: true },
+        { op: "box", x0: -5, y0: 10, z0: -1, x1: 5, y1: 11, z1: 1, color: "woodDark" },
+        { op: "box", x0: -4, y0: 4, z0: 0, x1: 4, y1: 4, z1: 0, color: "gold" },
+        { op: "box", x0: -4, y0: 6, z0: 0, x1: 4, y1: 6, z1: 0, color: "gold" },
+        { op: "box", x0: -4, y0: 8, z0: 0, x1: 4, y1: 8, z1: 0, color: "gold" },
+        { op: "box", x0: -3, y0: 3, z0: -1, x1: -2, y1: 5, z1: 1, color: "red", emit: 0.7 },
+        { op: "box", x0: 0, y0: 3, z0: -1, x1: 1, y1: 5, z1: 1, color: "cyan", emit: 0.7 },
+        { op: "box", x0: -2, y0: 5, z0: -1, x1: -1, y1: 7, z1: 1, color: "gold", emit: 0.8 },
+        { op: "box", x0: 2, y0: 7, z0: -1, x1: 3, y1: 9, z1: 1, color: "mint", emit: 0.8 },
+      );
+      break;
+    case "fraction_stand":
+      ops.push(
+        { op: "box", x0: -5, y0: 1, z0: -3, x1: 5, y1: 5, z1: 3, color: "wood" },
+        { op: "box", x0: -5, y0: 5, z0: -3, x1: 5, y1: 6, z1: 3, color: "cream" },
+        { op: "box", x0: -5, y0: 6, z0: -3, x1: -4, y1: 11, z1: -2, color: "woodDark", mirrorX: true },
+        { op: "box", x0: -6, y0: 11, z0: -4, x1: 6, y1: 12, z1: 4, color: "crimson" },
+        { op: "box", x0: -4, y0: 11, z0: -4, x1: -2, y1: 12, z1: 4, color: "cream", mirrorX: true },
+      );
+      parts.push({
+        name: "pizza-wheel",
+        kind: "spinY",
+        speed: 0.9,
+        pivot: [0, 8, 0],
+        ops: [
+          { op: "cylinder", axis: "y", cx: 0, cz: 0, y0: 0, y1: 1, radius: 3, color: "gold", emit: 1.1 },
+          { op: "box", x0: 0, y0: 0, z0: 0, x1: 3, y1: 1, z1: 2, color: "crimson", emit: 1.3 },
+        ],
+      });
+      break;
+    case "balance_scale":
+      ops.push(
+        { op: "box", x0: -3, y0: 1, z0: -3, x1: 3, y1: 2, z1: 3, color: "stone" },
+        { op: "box", x0: -1, y0: 2, z0: -1, x1: 1, y1: 11, z1: 1, color: "gold", emit: 0.6 },
+        { op: "box", x0: -1, y0: 11, z0: -1, x1: 1, y1: 12, z1: 1, color: "amber", emit: 1.2 },
+      );
+      parts.push({
+        name: "scale-beam",
+        kind: "swingZ",
+        speed: 1.4,
+        amp: 0.16,
+        pivot: [0, 10.5, 0],
+        ops: [
+          { op: "box", x0: -6, y0: 0, z0: -1, x1: 6, y1: 1, z1: 1, color: "gold" },
+          { op: "box", x0: -6, y0: -4, z0: -2, x1: -4, y1: -3, z1: 2, color: "cyan", emit: 1.0, mirrorX: true },
+          { op: "box", x0: -6, y0: -3, z0: 0, x1: -5, y1: 0, z1: 0, color: "silver", mirrorX: true },
+          { op: "box", x0: -6, y0: -3, z0: -1, x1: -4, y1: -1, z1: 1, color: "mint", emit: 1.1 },
+          { op: "box", x0: 4, y0: -3, z0: -1, x1: 6, y1: -1, z1: 1, color: "pink", emit: 1.1 },
+        ],
+      });
+      break;
+    case "pendulum_tower":
+      ops.push(
+        { op: "box", x0: -4, y0: 1, z0: -4, x1: -3, y1: 14, z1: -3, color: "stone", mirrorX: true },
+        { op: "box", x0: -4, y0: 1, z0: 3, x1: -3, y1: 14, z1: 4, color: "stone", mirrorX: true },
+        { op: "box", x0: -4, y0: 14, z0: -4, x1: 4, y1: 15, z1: 4, color: "gold" },
+        { op: "box", x0: -2, y0: 15, z0: -2, x1: 2, y1: 16, z1: 2, color: "cyan", emit: 1.3 },
+      );
+      parts.push({
+        name: "pendulum-arm",
+        kind: "swingZ",
+        speed: 2.1,
+        amp: 0.42,
+        pivot: [0, 13.5, 0],
+        ops: [
+          { op: "box", x0: 0, y0: -9, z0: 0, x1: 0, y1: 0, z1: 0, color: "silver" },
+          { op: "sphere", cx: 0, cy: -10, cz: 0, rx: 2, ry: 2, rz: 2, color: "amber", emit: 1.4 },
+        ],
+      });
+      break;
+    case "rocket_pad":
+      ops.push(
+        { op: "box", x0: -5, y0: 1, z0: -5, x1: 5, y1: 2, z1: 5, color: "charcoal" },
+        { op: "box", x0: -4, y0: 2, z0: -4, x1: -3, y1: 12, z1: -3, color: "iron" },
+        { op: "box", x0: -4, y0: 10, z0: -3, x1: -1, y1: 11, z1: -2, color: "amber" },
+        { op: "box", x0: -2, y0: 2, z0: -2, x1: 2, y1: 3, z1: 2, color: "orange", emit: 1.2 },
+      );
+      parts.push({
+        name: "rocket-body",
+        kind: "bob",
+        speed: 1.8,
+        amp: 0.45,
+        pivot: [0, 4, 0],
+        ops: [
+          { op: "cylinder", axis: "y", cx: 0, cz: 0, y0: 0, y1: 8, radius: 1.8, color: "white" },
+          { op: "box", x0: -2, y0: 0, z0: -1, x1: 2, y1: 2, z1: 1, color: "crimson" },
+          { op: "cone", cx: 0, y0: 8, y1: 11, cz: 0, rBottom: 1.9, rTop: 0.4, color: "red", emit: 0.9 },
+          { op: "box", x0: -1, y0: -2, z0: -1, x1: 1, y1: 0, z1: 1, color: "amber", emit: 1.6 },
+        ],
+      });
+      break;
+    case "ferris_wheel":
+      ops.length = 0;
+      ops.push(
+        { op: "box", x0: -6, y0: 0, z0: -5, x1: 6, y1: 1, z1: 5, color: "stone" },
+        { op: "box", x0: -4, y0: 1, z0: -3, x1: -3, y1: 10, z1: -2, color: "iron", mirrorX: true },
+        { op: "box", x0: -2, y0: 1, z0: 2, x1: -1, y1: 10, z1: 3, color: "iron", mirrorX: true },
+        { op: "box", x0: -2, y0: 9, z0: -3, x1: 2, y1: 10, z1: 3, color: "gold", emit: 1.1 },
+      );
+      parts.push({
+        name: "wheel-rim",
+        kind: "spinZ",
+        speed: 0.65,
+        pivot: [0, 10, 0],
+        ops: [
+          { op: "ring", axis: "z", cx: 0, cy: 0, z0: -1, z1: 1, outerR: 7, innerR: 6, color: "cream", emit: 0.8 },
+          { op: "box", x0: -7, y0: -1, z0: -2, x1: -5, y1: 1, z1: 2, color: "pink", emit: 1.4 },
+          { op: "box", x0: 5, y0: -1, z0: -2, x1: 7, y1: 1, z1: 2, color: "cyan", emit: 1.4 },
+          { op: "box", x0: -1, y0: 5, z0: -2, x1: 1, y1: 7, z1: 2, color: "gold", emit: 1.4 },
+          { op: "box", x0: -1, y0: -7, z0: -2, x1: 1, y1: -5, z1: 2, color: "mint", emit: 1.4 },
+        ],
+      });
+      break;
     case "venn_rings":
     default:
       ops.push(
@@ -1058,7 +1470,7 @@ function buildMotifBlueprint(spec: MathMonumentSpec): VoxelBlueprint {
   return normalizeAndGroundBlueprint({
     name: spec.name,
     description: spec.description,
-    category: "prop",
+    category: spec.category ?? "prop",
     scaleClass: spec.scaleClass,
     ops,
     parts,
@@ -1143,13 +1555,14 @@ export function ensureMathCampusCreations(
       description: spec.description,
       creatorPrompt:
         spec.chapterNum === "HQ" ||
+        spec.chapterNum === "HSE" ||
         spec.chapterNum === "FX" ||
         spec.chapterNum === "CAR" ||
         spec.chapterNum === "TRN" ||
         spec.chapterNum === "STN"
           ? `MATH_LAND Interactive Attraction by AARUTO + DIPU-_-: ${spec.name}`
           : `MATH_LAND Chapter ${spec.chapterNum}: ${spec.name}`,
-      category: "prop",
+      category: spec.category ?? "prop",
       scaleClass: spec.scaleClass,
       x: Number(px.toFixed(2)),
       z: Number(pz.toFixed(2)),
@@ -1173,7 +1586,7 @@ export function ensureMathCampusCreations(
       createdAt: baseTs + i * 1000,
       isSeed: true,
     };
-    if (creation.behavior?.type !== "vehicle_route" && spec.id !== "math-turbo-roadster") {
+    if (creation.behavior?.type !== "vehicle_route" && spec.category !== "vehicle") {
       const roadYaw = computeIntelligentBuildingYaw(creation, existingPaths);
       if (typeof roadYaw === "number") {
         creation.yaw = roadYaw;

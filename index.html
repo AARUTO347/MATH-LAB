@@ -6,7 +6,7 @@
     <title>MATH_LAND</title>
     <meta
       name="description"
-      content="Landscape pixel-art gaming console running the live animated 3D MATH_LAND voxel world with 20 interactive mathematics and AI chapters."
+      content="Landscape pixel-art gaming console running the live animated 3D MATH_LAND voxel world with 26 interactive CBSE Class 1-12 math labs, basic labs & real-life experiments."
     />
     <meta name="theme-color" content="#f27668" />
 
@@ -23,7 +23,7 @@
     <meta property="og:title" content="MATH_LAND" />
     <meta
       property="og:description"
-      content="Landscape pixel-art gaming console running the live animated 3D MATH_LAND voxel world with 20 interactive mathematics and AI chapters."
+      content="Landscape pixel-art gaming console running the live animated 3D MATH_LAND voxel world with 26 interactive CBSE Class 1-12 math labs, basic labs & real-life experiments."
     />
 
     <!-- X / Twitter -->
@@ -31,7 +31,7 @@
     <meta name="twitter:title" content="MATH_LAND" />
     <meta
       name="twitter:description"
-      content="Landscape pixel-art gaming console running the live animated 3D MATH_LAND voxel world with 20 interactive mathematics and AI chapters."
+      content="Landscape pixel-art gaming console running the live animated 3D MATH_LAND voxel world with 26 interactive CBSE Class 1-12 math labs, basic labs & real-life experiments."
     />
 
     <!-- Web App -->
@@ -51,7 +51,7 @@
         <div class="top-brand">
           <h1>MATH<em>_LAND</em></h1>
           <span class="dev-badge">MADE BY &ldquo;AARUTO&rdquo; + &ldquo;DIPU-_-&rdquo;</span>
-          <span class="top-sub">3D Voxel Island &middot; 20 Interactive Math &amp; AI Chapters</span>
+          <span class="top-sub">3D Voxel Island &middot; 26 CBSE Class 1&ndash;12 Math &amp; Basic Labs</span>
         </div>
 
         <div class="key-guide" aria-label="Keyboard and console controls">
@@ -63,15 +63,15 @@
 
         <div class="top-actions">
           <div class="top-metrics" aria-label="Live world metrics">
-            <span id="score-builds">00203 BUILDS</span>
+            <span id="score-builds">00214 BUILDS</span>
             <span aria-hidden="true">/</span>
             <span id="score-mode">MODE: PAN</span>
             <span aria-hidden="true">/</span>
             <span id="score-xp">XP 0000</span>
             <span aria-hidden="true">/</span>
-            <span id="score-mastery">0/20&#9733;</span>
+            <span id="score-mastery">0/26&#9733;</span>
             <span aria-hidden="true">/</span>
-            <span id="score-chapter">CH 00 &middot; ALGEBRA</span>
+            <span id="score-chapter">CH B1 &middot; NUMBERS</span>
           </div>
           <button type="button" id="arcade-hop-btn" class="top-cta-btn is-gold" title="Visit AARUTO + DIPU-_- Dev Arcade HQ & World Toys">
             DEV HQ &amp; TOYS
@@ -134,8 +134,11 @@
                 <button type="button" id="bezel-toys-btn" class="bezel-tool-btn is-gold" title="Visit AARUTO + DIPU-_- Dev HQ &amp; interactive world toys">
                   HQ / TOYS
                 </button>
-                <button type="button" id="bezel-labs-btn" class="bezel-tool-btn" title="Open 20 Math Labs">
-                  LABS
+                <button type="button" id="bezel-quests-btn" class="bezel-tool-btn" title="Open MATH_LAND World Quest Book">
+                  QUESTS
+                </button>
+                <button type="button" id="bezel-labs-btn" class="bezel-tool-btn" title="Open 26 Math & Basic Labs">
+                  26 LABS
                 </button>
                 <button
                   type="button"
@@ -275,6 +278,44 @@
                 <kbd class="walk-esc-key">Esc</kbd><span>exit walk</span>
               </button>
 
+              <!-- Touch / Mobile Camera Look & Quick Actions Pad -->
+              <div id="mobile-rotate-pad" class="mobile-rotate-pad" aria-label="Camera rotation and quick actions">
+                <div class="rot-cross">
+                  <button type="button" id="rot-up-btn" class="rot-btn rot-up" title="Tilt camera up" aria-label="Tilt camera up">&#9650;</button>
+                  <button type="button" id="rot-left-btn" class="rot-btn rot-left" title="Rotate camera left" aria-label="Rotate camera left">&#9664;</button>
+                  <button type="button" id="rot-right-btn" class="rot-btn rot-right" title="Rotate camera right" aria-label="Rotate camera right">&#9654;</button>
+                  <button type="button" id="rot-down-btn" class="rot-btn rot-down" title="Tilt camera down" aria-label="Tilt camera down">&#9660;</button>
+                </div>
+                <div class="rot-quick-row">
+                  <button type="button" id="quest-hud-btn" class="hud-mini-btn" title="Open Quest Book">QUESTS</button>
+                  <button type="button" id="house-hop-btn" class="hud-mini-btn is-gold" title="Visit Cozy House">HOUSE</button>
+                </div>
+              </div>
+
+              <!-- Car Driving HUD (visible while driving any island car) -->
+              <div id="drive-hud" class="vehicle-hud" role="region" aria-label="Car driving controls" hidden>
+                <div class="veh-head">
+                  <span id="drive-car-name" class="veh-name">ROADSTER</span>
+                  <span id="drive-speed" class="veh-speed">00 km/h</span>
+                </div>
+                <div class="veh-controls">
+                  <button type="button" id="drive-left-btn" class="veh-btn" aria-label="Steer left">&#9664;</button>
+                  <button type="button" id="drive-gas-btn" class="veh-btn is-go">GAS</button>
+                  <button type="button" id="drive-brake-btn" class="veh-btn">BRK</button>
+                  <button type="button" id="drive-right-btn" class="veh-btn" aria-label="Steer right">&#9654;</button>
+                  <button type="button" id="drive-turbo-btn" class="veh-btn is-gold">BOOST</button>
+                  <button type="button" id="drive-horn-btn" class="veh-btn">HORN</button>
+                  <button type="button" id="drive-exit-btn" class="veh-btn is-exit">EXIT</button>
+                </div>
+              </div>
+
+              <!-- Express Train Passenger HUD -->
+              <div id="train-hud" class="vehicle-hud train-hud" role="region" aria-label="Express train controls" hidden>
+                <span class="veh-name">MATH_LAND EXPRESS</span>
+                <button type="button" id="train-whistle-btn" class="veh-btn is-gold">WHISTLE</button>
+                <button type="button" id="train-exit-btn" class="veh-btn is-exit">HOP OFF</button>
+              </div>
+
               <!-- Contextual Interaction Prompt -->
               <button type="button" id="interact-prompt" class="interact-prompt" hidden>
                 <kbd id="interact-key" class="interact-key">E</kbd><span id="interact-label">Interact</span>
@@ -362,6 +403,7 @@
                 <header class="ml-header">
                   <div class="ml-title-wrap">
                     <span id="ml-badge" class="ml-badge">CH 00</span>
+                    <span id="ml-cbse-badge" class="ml-cbse-badge">Class 1&ndash;12</span>
                     <h2 id="ml-title" class="ml-title">Algebra Overview</h2>
                   </div>
                   <div class="ml-tabs" role="tablist">
@@ -390,10 +432,29 @@
                       <button type="button" id="ml-speed-btn" class="ml-tool-btn">1x</button>
                       <button type="button" id="ml-rand-btn" class="ml-tool-btn">RANDOM</button>
                       <button type="button" id="ml-reset-btn" class="ml-tool-btn" title="Reset sliders to chapter defaults">RESET</button>
+                      <button type="button" id="ml-theme-btn" class="ml-tool-btn" title="Toggle Dark Blueprint vs Graph Paper Light theme">PAPER</button>
+                      <button type="button" id="ml-exp-mode-btn" class="ml-tool-btn is-exp" title="Toggle Real-Life Experiment Simulation" hidden>EXPMT</button>
+                      <button type="button" id="ml-exp-action-btn" class="ml-tool-btn is-gold" title="Trigger Real-Life Experiment Trial" hidden>RUN TRIAL</button>
+                      <button type="button" id="ml-tangent-btn" class="ml-tool-btn is-active" title="Toggle tangent &amp; normal line">TANGENT</button>
+                      <button type="button" id="ml-integral-btn" class="ml-tool-btn" title="Shade definite integral area">&int; AREA</button>
+                      <button type="button" id="ml-polar-btn" class="ml-tool-btn" title="Toggle Polar r(θ) vs Cartesian f(x)">POLAR</button>
+                      <button type="button" id="ml-zoom-out-btn" class="ml-tool-btn" title="Zoom out">-</button>
+                      <button type="button" id="ml-zoom-in-btn" class="ml-tool-btn" title="Zoom in">+</button>
+                      <button type="button" id="ml-snap-btn" class="ml-tool-btn" title="Download PNG snapshot">SNAP</button>
+                      <button type="button" id="ml-sonify-btn" class="ml-tool-btn" title="Play live mathematical curve tone">AUDIO</button>
                       <button type="button" id="ml-mission-pill" class="ml-mission-pill" title="Open Activity &amp; Quiz tab">
                         MISSION: ACTIVE
                       </button>
-                      <span class="ml-drag-hint">DRAG CANVAS</span>
+                    </div>
+                    <div id="ml-expr-row" class="ml-expr-row">
+                      <label class="ml-expr-field">
+                        <span>f(x)=</span>
+                        <input id="ml-expr-a" type="text" value="p1 * sin(x) + p2 * 0.4" aria-label="Custom formula f(x)" />
+                      </label>
+                      <label class="ml-expr-field">
+                        <span>g(x)=</span>
+                        <input id="ml-expr-b" type="text" value="0.35 * x^2 - 1" aria-label="Comparison formula g(x)" />
+                      </label>
                     </div>
                     <canvas id="math-lab-canvas" width="720" height="320" aria-label="Interactive math simulation canvas"></canvas>
                     <div id="ml-readout" class="ml-readout"></div>
@@ -412,6 +473,30 @@
                       </label>
                     </div>
                     <div id="ml-presets" class="ml-presets"></div>
+                    <div id="ml-steps-box" class="ml-steps-box">Step 1: Tune sliders to evaluate live steps.</div>
+                    <div class="ml-tutor-box" aria-label="Gemini Math Tutor and Spoken Audio">
+                      <div class="ml-tutor-head">
+                        <span>GEMINI TUTOR &amp; AUDIO</span>
+                        <button type="button" id="ml-tutor-speak-btn" class="ml-tool-btn is-gold" title="Hear spoken Gemini TTS explanation">SPEAK TTS</button>
+                      </div>
+                      <div class="ml-tutor-controls">
+                        <select id="ml-tutor-model" class="ml-select" aria-label="Tutor Gemini model">
+                          <option value="auto">AI: Auto (2.5+4H)</option>
+                          <option value="gemini-2.5-flash" selected>AI: Gemini 2.5 Flash</option>
+                          <option value="gemini-4-hydrogen">AI: Gemini 4 Hydrogen</option>
+                        </select>
+                        <select id="ml-tts-engine" class="ml-select" aria-label="Voice TTS model">
+                          <option value="auto" selected>TTS: Auto (Both)</option>
+                          <option value="2.5">TTS: Gemini 2.5</option>
+                          <option value="3.8">TTS: Gemini 3.8</option>
+                        </select>
+                      </div>
+                      <div class="ml-tutor-input-row">
+                        <input id="ml-tutor-input" type="text" placeholder="Ask about this formula or experiment..." aria-label="Ask Gemini Math Tutor" />
+                        <button type="button" id="ml-tutor-ask-btn" class="ml-tool-btn">ASK</button>
+                      </div>
+                      <p id="ml-tutor-answer" class="ml-tutor-answer">Click ASK for a Gemini 2.5 Flash breakdown or SPEAK TTS to listen.</p>
+                    </div>
                     <div class="ml-facts">
                       <p><strong>AI &amp; Tech:</strong> <span id="ml-ai-text"></span></p>
                       <p><strong>Real-World:</strong> <span id="ml-real-text"></span></p>
@@ -454,9 +539,10 @@
                 <div class="pause-card">
                   <h3>PAUSED &middot; MATH_LAND</h3>
                   <p class="pause-credit">MADE BY &ldquo;AARUTO&rdquo; + &ldquo;DIPU-_-&rdquo;</p>
-                  <p id="pause-stats" class="pause-stats">RANK: VOXEL NOVICE &middot; XP 0000 &middot; 0/20 LABS</p>
+                  <p id="pause-stats" class="pause-stats">RANK: VOXEL NOVICE &middot; XP 0000 &middot; 0/26 LABS</p>
                   <button type="button" id="pause-resume-btn" class="pause-btn is-primary">RESUME 3D WORLD</button>
-                  <button type="button" id="pause-labs-btn" class="pause-btn">OPEN 20 MATH LABS</button>
+                  <button type="button" id="pause-labs-btn" class="pause-btn">OPEN 26 MATH LABS</button>
+                  <button type="button" id="pause-quests-btn" class="pause-btn">OPEN QUEST BOOK</button>
                   <button type="button" id="pause-dev-btn" class="pause-btn is-gold">VISIT DEV ARCADE HQ</button>
                   <button type="button" id="pause-tour-btn" class="pause-btn">AUTO TOUR ISLAND</button>
                   <button type="button" id="pause-add-btn" class="pause-btn">+ ADD 3D CREATION</button>
@@ -514,17 +600,25 @@
         </div>
       </section>
 
-      <!-- Bottom 20 Math & AI Chapter Cartridges Dock -->
-      <section class="cartridge-panel" aria-label="20 Math Chapter Cartridges">
+      <!-- Bottom 26 CBSE Math & Basic Lab Cartridges Dock -->
+      <section class="cartridge-panel" aria-label="26 CBSE Math and Basic Lab Cartridges">
         <div class="cartridge-header">
-          <span>20 CHAPTER CARTRIDGES &middot; CLICK TO LAUNCH LAB OR BLUEPRINT SHEET</span>
+          <span>26 CBSE MATH &amp; BASIC LABS (CLASS 1&ndash;12) &middot; CLICK TO LAUNCH LAB OR BLUEPRINT SHEET</span>
           <button type="button" id="open-atlas-right-btn" class="cartridge-atlas-btn">
             OPEN ACTIVE LAB
           </button>
         </div>
+        <div id="grade-filter-bar" class="grade-filter-bar" role="group" aria-label="CBSE Class 1-12 Grade Filter">
+          <button type="button" class="grade-filter-btn is-active" data-grade="all">ALL (26)</button>
+          <button type="button" class="grade-filter-btn" data-grade="basic">BASIC (5)</button>
+          <button type="button" class="grade-filter-btn" data-grade="1-5">CLASS 1&ndash;5</button>
+          <button type="button" class="grade-filter-btn" data-grade="6-8">CLASS 6&ndash;8</button>
+          <button type="button" class="grade-filter-btn" data-grade="9-10">CLASS 9&ndash;10</button>
+          <button type="button" class="grade-filter-btn" data-grade="11-12">CLASS 11&ndash;12</button>
+        </div>
         <div id="chapter-rack" class="chapter-rack" role="list"></div>
         <div class="attraction-bar">
-          <span class="attraction-bar-title">DEV HQ &amp; INTERACTIVE 3D TOYS</span>
+          <span class="attraction-bar-title">DEV HQ, BASIC MATH PARK, EXPERIMENT YARD, CARS &amp; HOUSE</span>
           <div id="attraction-rack" class="attraction-rack" role="list"></div>
         </div>
       </section>
@@ -538,6 +632,7 @@
     </div>
 
     <dialog id="avatar-dialog" class="avatar-dialog" closedby="any" aria-label="Character customizer"></dialog>
+    <dialog id="quest-dialog" class="quest-dialog" closedby="any" aria-label="MATH_LAND Quest Book"></dialog>
 
     <script type="module" src="/client/app.js"></script>
   </body>

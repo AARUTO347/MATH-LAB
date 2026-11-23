@@ -1283,6 +1283,165 @@ function buildProceduralRoom(creation) {
     }
     boxObstacles.push({ minX: 4.25, maxX: 5.2, minZ: -3.25, maxZ: -0.6 });
     addPottedPlant(vox, -27, 23);
+
+    // C. Quest Book Lectern on left side (gx = -22, gz = 8)
+    vox.box(-24, 0, 6, -20, 6, 10, "woodDark");
+    vox.box(-25, 6, 5, -19, 7, 11, "oak");
+    circleObstacles.push({ x: -22 * s, z: 8 * s, r: 0.52 });
+    const questBookVox = new Vox(1653);
+    questBookVox.box(-3, 0, -2, 3, 1, 2, "crimson");
+    questBookVox.box(-2, 1, -1, 0, 2, 1, "cream", 0.55);
+    questBookVox.box(0, 1, -1, 2, 2, 1, "cream", 0.55);
+    questBookVox.box(-1, 2, 0, 1, 2, 0, "gold", 1.35);
+    const questBookMesh = registerMesh(
+      buildVoxelMesh(questBookVox, { scale: sf, castShadow: false, depthLayer: 3 }),
+    );
+    questBookMesh.position.set(-22 * s, 7.6 * s, 8 * s);
+    group.add(questBookMesh);
+    hotspots.push({
+      id: "quest_book",
+      kind: "interior_prop",
+      label: "Open Quest Book",
+      x: -22 * s,
+      y: 1.2,
+      z: 8 * s,
+      onTrigger: () => {
+        playChime([523.25, 659.25, 783.99, 1046.5], 0.055, 0.16, "triangle", 0.055);
+        return {
+          ok: true,
+          uiAction: "open_quest_book",
+          message: "Opened the MATH_LAND Quest Book!",
+        };
+      },
+    });
+    animHooks.push((_dt, t) => {
+      questBookMesh.position.y = 7.6 * s + Math.sin(t * 2.8) * 0.04;
+      questBookMesh.rotation.y = Math.sin(t * 1.1) * 0.18;
+    });
+
+    // D. Retro Pixel TV Console & 4-Channel Animated Screen (gx = 18..26, gz = -28..-22)
+    vox.box(16, 0, -29, 26, 4, -23, "woodDark");
+    vox.box(17, 4, -28, 25, 11, -24, "charcoal");
+    boxObstacles.push({ minX: 2.55, maxX: 4.25, minZ: -4.75, maxZ: -3.55 });
+    const tvCanvas = document.createElement("canvas");
+    tvCanvas.width = 160;
+    tvCanvas.height = 96;
+    const tvCtx = tvCanvas.getContext("2d");
+    const tvTex = new THREE.CanvasTexture(tvCanvas);
+    tvTex.magFilter = THREE.NearestFilter;
+    tvTex.minFilter = THREE.NearestFilter;
+    const tvGeo = new THREE.PlaneGeometry(1.12, 0.68);
+    const tvMat = new THREE.MeshBasicMaterial({ map: tvTex });
+    const tvMesh = new THREE.Mesh(tvGeo, tvMat);
+    tvMesh.position.set(21 * s, 7.6 * s, -23.8 * s);
+    tvMesh.rotation.y = -0.32;
+    disposableGeos.push(tvGeo);
+    disposableMats.push(tvMat);
+    group.add(tvMesh);
+    let tvChannel = 0;
+    const TV_CHANNELS = [
+      { title: "CH1: GRAPH STUDIO LIVE", bg: "#171537", fg: "#87e8f4" },
+      { title: "CH2: EXPRESS RAIL RADAR", bg: "#122b23", fg: "#5ef28c" },
+      { title: "CH3: TURBO CAR TELEMETRY", bg: "#351428", fg: "#ff4d78" },
+      { title: "CH4: AARUTO + DIPU-_-", bg: "#29265f", fg: "#ffe089" },
+    ];
+    let lastTvRedraw = -1;
+    hotspots.push({
+      id: "tv_screen",
+      kind: "interior_prop",
+      label: "Switch TV Channel",
+      x: 21 * s,
+      y: 1.2,
+      z: -22.5 * s,
+      onTrigger: () => {
+        tvChannel = (tvChannel + 1) % TV_CHANNELS.length;
+        lastTvRedraw = -1;
+        playChime([587.33, 880], 0.04, 0.1, "square", 0.045);
+        const chInfo = TV_CHANNELS[tvChannel];
+        return {
+          ok: true,
+          uiAction: "tv_channel",
+          channel: tvChannel + 1,
+          message: `House TV tuned to ${chInfo.title}`,
+        };
+      },
+    });
+    animHooks.push((_dt, t) => {
+      if (!tvCtx || Math.abs(t - lastTvRedraw) < 0.1) return;
+      lastTvRedraw = t;
+      const ch = TV_CHANNELS[tvChannel];
+      tvCtx.fillStyle = ch.bg;
+      tvCtx.fillRect(0, 0, 160, 96);
+      tvCtx.fillStyle = ch.fg;
+      tvCtx.font = "bold 9px monospace";
+      tvCtx.fillText(ch.title, 8, 16);
+      tvCtx.strokeStyle = ch.fg;
+      tvCtx.lineWidth = 2;
+      tvCtx.beginPath();
+      for (let px = 8; px <= 152; px += 4) {
+        const u = (px - 8) / 144;
+        const py =
+          54 +
+          (tvChannel === 0
+            ? Math.sin(u * 8 + t * 3.5) * 20
+            : tvChannel === 1
+              ? Math.cos(u * 6 - t * 2.8) * 16
+              : tvChannel === 2
+                ? Math.sin(u * 12 + t * 5.0) * 14
+                : Math.sin(u * 5 + t * 2.2) * 18);
+        if (px === 8) tvCtx.moveTo(px, py);
+        else tvCtx.lineTo(px, py);
+      }
+      tvCtx.stroke();
+      tvTex.needsUpdate = true;
+    });
+
+    // E. Copper Tea Kettle on Coffee Table + Steam animation
+    const kettleVox = new Vox(1655);
+    kettleVox.box(-1, 0, -1, 1, 2, 1, "copper");
+    kettleVox.put(0, 2, 0, "brass", 0.6);
+    const kettleMesh = registerMesh(
+      buildVoxelMesh(kettleVox, { scale: sf, castShadow: false, depthLayer: 3 }),
+    );
+    kettleMesh.position.set(3.5 * s, 3.3 * s, -12 * s);
+    group.add(kettleMesh);
+    const kettleSteamVox = new Vox(1657);
+    kettleSteamVox.sphere(0, 0, 0, 1.3, 1.6, 1.3, "white", 0.9);
+    const kettleSteamMesh = registerMesh(
+      buildVoxelMesh(kettleSteamVox, { scale: sf, castShadow: false, depthLayer: 4 }),
+    );
+    kettleSteamMesh.visible = false;
+    group.add(kettleSteamMesh);
+    let teaTimer = 0;
+    hotspots.push({
+      id: "tea_kettle",
+      kind: "interior_prop",
+      label: "Brew Cozy Tea",
+      x: 3.5 * s,
+      y: 0.78,
+      z: -12 * s,
+      onTrigger: () => {
+        teaTimer = 2.6;
+        playSoftNoise(0.24, 0.04);
+        playChime([659.25, 783.99, 987.77], 0.06, 0.16, "sine", 0.05);
+        return {
+          ok: true,
+          uiAction: "brew_tea",
+          message: "Brewed warm honey tea in Cozy House!",
+        };
+      },
+    });
+    animHooks.push((dt, t) => {
+      if (teaTimer > 0) {
+        teaTimer = Math.max(0, teaTimer - dt);
+        kettleSteamMesh.visible = true;
+        const u = 1 - (teaTimer % 0.85) / 0.85;
+        kettleSteamMesh.position.set(3.5 * s + Math.sin(t * 7) * 0.03, 0.65 + u * 0.45, -12 * s);
+        kettleSteamMesh.scale.setScalar(0.45 + u * 0.65);
+      } else {
+        kettleSteamMesh.visible = false;
+      }
+    });
   }
 
   // ── 5. Interactive Floor Lamp Stand (`Toggle Lamp`) ─────────────────────────
@@ -2139,8 +2298,13 @@ export function createInteriorAndTransitSystem({
               if (hs.kind === "sit" && hs.seatTarget) {
                 return sitAt(hs.seatTarget);
               }
-              hs.onTrigger?.();
-              return { ok: true, id: hs.id, label: hs.label };
+              const res = hs.onTrigger?.();
+              return {
+                ok: true,
+                id: hs.id,
+                label: hs.label,
+                ...(res && typeof res === "object" ? res : {}),
+              };
             },
           };
         }

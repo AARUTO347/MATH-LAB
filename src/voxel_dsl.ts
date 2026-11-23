@@ -1025,6 +1025,12 @@ const INTERACTION_KINDS: Record<InteractionKind, true> = {
   tesla_coil: true,
   gravity_inverter: true,
   marble_run: true,
+  abacus_frame: true,
+  fraction_stand: true,
+  balance_scale: true,
+  pendulum_tower: true,
+  rocket_pad: true,
+  ferris_wheel: true,
 };
 
 export function sanitizeInteraction(

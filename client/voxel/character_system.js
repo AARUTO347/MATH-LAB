@@ -1019,6 +1019,41 @@ export function buildCharacterAvatarRig(appearance, options = {}) {
   rightLeg.position.set(-1.12 * s, 4.1 * s, 0);
   bodyPivot.add(rightLeg);
 
+  // Miniature glowing voxel world orb that blooms above outstretched palms on "world come from hand" reveal
+  const handWorldOrb = new THREE.Group();
+  handWorldOrb.name = "handWorldOrb";
+  handWorldOrb.visible = false;
+  bodyPivot.add(handWorldOrb);
+
+  const orbCoreMat = new THREE.MeshStandardMaterial({
+    color: 0x5ecfff,
+    emissive: 0x26b6e8,
+    emissiveIntensity: 0.72,
+    roughness: 0.28,
+    metalness: 0.15,
+  });
+  const orbLandMat = new THREE.MeshStandardMaterial({
+    color: 0x5ef28c,
+    emissive: 0x2fd065,
+    emissiveIntensity: 0.45,
+    roughness: 0.35,
+  });
+  const orbRingMat = new THREE.MeshBasicMaterial({
+    color: 0xffe089,
+    transparent: true,
+    opacity: 0.86,
+    side: THREE.DoubleSide,
+  });
+  const orbCoreGeo = new THREE.BoxGeometry(1.85 * s, 1.85 * s, 1.85 * s);
+  const orbLandGeo = new THREE.BoxGeometry(2.05 * s, 0.72 * s, 1.35 * s);
+  const orbRingGeo = new THREE.RingGeometry(1.55 * s, 2.05 * s, 24);
+  orbRingGeo.rotateX(Math.PI * 0.42);
+  const orbCoreMesh = new THREE.Mesh(orbCoreGeo, orbCoreMat);
+  const orbLandMesh = new THREE.Mesh(orbLandGeo, orbLandMat);
+  orbLandMesh.position.y = 0.2 * s;
+  const orbRingMesh = new THREE.Mesh(orbRingGeo, orbRingMat);
+  handWorldOrb.add(orbCoreMesh, orbLandMesh, orbRingMesh);
+
   let currentAppearance = sanitizeAppearance(appearance);
   let currentSig = "";
   let fpMode = false;
@@ -1313,6 +1348,24 @@ export function buildCharacterAvatarRig(appearance, options = {}) {
     } else {
       bodyPivot.position.set(0, smoothBodyLift, 0);
     }
+
+    // Animate miniature voxel MATH_LAND globe summoned from outstretched hands
+    const handReveal = isOpening
+      ? Math.sin(Math.max(0.05, Math.min(1, Number(openingTimer) / 1.65)) * Math.PI)
+      : actionTimer > 0.04
+        ? Math.sin(Math.max(0, Math.min(1, Number(actionTimer) / 0.42)) * Math.PI) * 0.65
+        : 0;
+    if (handReveal > 0.03 && !isDriving) {
+      handWorldOrb.visible = true;
+      const forwardZ = fpMode ? 3.55 * s : 3.25 * s;
+      const liftY = (fpMode ? 9.8 : 10.6) * s + Math.sin(t * 5.2) * 0.14 * s;
+      handWorldOrb.position.set(0, liftY, forwardZ);
+      handWorldOrb.scale.setScalar(Math.max(0.18, handReveal * (fpMode ? 0.85 : 1.08)));
+      handWorldOrb.rotation.y = t * 2.4;
+      orbRingMesh.rotation.z = t * 1.9;
+    } else {
+      handWorldOrb.visible = false;
+    }
   }
 
   function dispose() {
@@ -1322,6 +1375,12 @@ export function buildCharacterAvatarRig(appearance, options = {}) {
     disposeObjectGeometries(rightArm);
     disposeObjectGeometries(leftLeg);
     disposeObjectGeometries(rightLeg);
+    orbCoreGeo.dispose();
+    orbLandGeo.dispose();
+    orbRingGeo.dispose();
+    orbCoreMat.dispose();
+    orbLandMat.dispose();
+    orbRingMat.dispose();
   }
 
   setAppearance(currentAppearance);

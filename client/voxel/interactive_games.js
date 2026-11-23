@@ -2325,6 +2325,382 @@ function createMarbleRunController(creation, group) {
   };
 }
 
+// ─── 14. Basic Math Park: Giant Place-Value Voxel Abacus ──────────────────────
+function createAbacusFrameController(creation, group) {
+  const root = new THREE.Group();
+  group.add(root);
+
+  const beadCols = ["#ff5a4f", "#ffe055", "#5ef28c"]; // 100s, 10s, 1s
+  const beads = [];
+  const hitMeshes = [];
+  const counts = [2, 4, 3]; // 243 initial
+
+  for (let row = 0; row < 3; row++) {
+    const ry = 0.72 + row * 0.42;
+    const rowBeads = [];
+    for (let i = 0; i < 5; i++) {
+      const bv = new Vox(1301 + row * 10 + i);
+      bv.sphere(0, 0, 0, 1.5, 1.5, 1.5, beadCols[row], 0.9);
+      const bm = buildVoxelMesh(bv, { scale: 0.068, depthLayer: 5 });
+      bm.position.set(-0.7 + i * 0.24, ry, 0.24);
+      root.add(bm);
+      rowBeads.push({ mesh: bm, targetX: -0.7 + i * 0.24 });
+    }
+    beads.push(rowBeads);
+    const hb = makeHitBox(1.9, 0.38, 0.75, creation.id, { row });
+    hb.position.set(0, ry, 0.24);
+    root.add(hb);
+    hitMeshes.push(hb);
+  }
+
+  function syncBeadTargets() {
+    for (let row = 0; row < 3; row++) {
+      const c = counts[row];
+      for (let i = 0; i < 5; i++) {
+        beads[row][i].targetX = i < c ? -0.68 + i * 0.16 : 0.14 + (i - c) * 0.16;
+      }
+    }
+  }
+  syncBeadTargets();
+
+  return {
+    kind: "abacus_frame",
+    hitMeshes,
+    extraRadius: 0,
+    setHovered() {},
+    trigger(action) {
+      ensureAudio();
+      const row = typeof action?.row === "number" ? action.row : 2;
+      counts[row] = (counts[row] + 1) % 6;
+      syncBeadTargets();
+      const value = counts[0] * 100 + counts[1] * 10 + counts[2];
+      playTone(392 + row * 110 + counts[row] * 35, 0.12, "triangle", 0.075);
+      return `Basic Park Abacus — Count = ${value} (${counts[0]}×100 + ${counts[1]}×10 + ${counts[2]})`;
+    },
+    step(dt) {
+      for (let row = 0; row < 3; row++) {
+        for (let i = 0; i < 5; i++) {
+          const b = beads[row][i];
+          b.mesh.position.x += (b.targetX - b.mesh.position.x) * Math.min(1, dt * 10);
+        }
+      }
+    },
+    dispose() {
+      beads.flat().forEach((b) => b.mesh.geometry.dispose());
+      hitMeshes.forEach((m) => m.geometry.dispose());
+    },
+  };
+}
+
+// ─── 15. Basic Math Park: Pizza Fraction Slicer Stand ─────────────────────────
+function createFractionStandController(creation, group) {
+  const root = new THREE.Group();
+  group.add(root);
+
+  const slices = [];
+  const fractions = [
+    { label: "1/2 (50%)", count: 4, total: 8 },
+    { label: "3/4 (75%)", count: 6, total: 8 },
+    { label: "1/4 (25%)", count: 2, total: 8 },
+    { label: "5/8 (62.5%)", count: 5, total: 8 },
+    { label: "8/8 (1 Whole)", count: 8, total: 8 },
+  ];
+  let fracIdx = 0;
+
+  for (let i = 0; i < 8; i++) {
+    const sv = new Vox(1351 + i);
+    sv.box(-1, 0, -1, 1, 1, 1, i % 2 === 0 ? "#ffe055" : "#ff7426", 1.15);
+    const sm = buildVoxelMesh(sv, { scale: 0.085, depthLayer: 5 });
+    const ang = (i / 8) * Math.PI * 2;
+    sm.position.set(Math.cos(ang) * 0.42, 1.38, Math.sin(ang) * 0.42);
+    root.add(sm);
+    slices.push({ mesh: sm, baseAng: ang, pop: 0 });
+  }
+
+  const hb = makeHitBox(1.8, 1.9, 1.8, creation.id, { slice: true });
+  hb.position.set(0, 1.1, 0);
+  root.add(hb);
+
+  return {
+    kind: "fraction_stand",
+    hitMeshes: [hb],
+    extraRadius: 0,
+    setHovered() {},
+    trigger() {
+      ensureAudio();
+      fracIdx = (fracIdx + 1) % fractions.length;
+      const f = fractions[fracIdx];
+      slices.forEach((s, i) => {
+        s.pop = i < f.count ? 1 : 0;
+      });
+      playArpeggio([440, 554.37, 659.25], 0.055, 0.14, "triangle", 0.07);
+      return `Fraction Pizza Stand — Highlighted ${f.label} (${f.count}/${f.total} slices)`;
+    },
+    step(dt, t) {
+      const f = fractions[fracIdx];
+      slices.forEach((s, i) => {
+        const active = i < f.count;
+        const targetY = active ? 1.56 + Math.sin(t * 3.5 + i * 0.5) * 0.06 : 1.34;
+        const r = active ? 0.52 : 0.36;
+        s.mesh.position.x += (Math.cos(s.baseAng + t * 0.6) * r - s.mesh.position.x) * Math.min(1, dt * 8);
+        s.mesh.position.z += (Math.sin(s.baseAng + t * 0.6) * r - s.mesh.position.z) * Math.min(1, dt * 8);
+        s.mesh.position.y += (targetY - s.mesh.position.y) * Math.min(1, dt * 8);
+      });
+    },
+    dispose() {
+      slices.forEach((s) => s.mesh.geometry.dispose());
+      hb.geometry.dispose();
+    },
+  };
+}
+
+// ─── 16. Basic Math Park: Algebra Balance Scale Plaza ──────────────────────────
+function createBalanceScaleController(creation, group) {
+  const root = new THREE.Group();
+  group.add(root);
+
+  const bv = new Vox(1381);
+  bv.box(-10, 0, -1, 10, 1, 1, "#ffe055", 0.85);
+  bv.box(-10, -4, -2, -7, 0, 2, "#4ce8e0", 1.1);
+  bv.box(7, -4, -2, 10, 0, 2, "#5ef28c", 1.1);
+  const beam = buildVoxelMesh(bv, { scale: 0.085, depthLayer: 5 });
+  beam.position.set(0, 1.65, 0);
+  root.add(beam);
+
+  const puzzles = [
+    { eq: "2x + 1 = 5 → x = 2 (Balanced!)", tilt: 0 },
+    { eq: "Left Heavy: 3x + 4 > 7", tilt: 0.24 },
+    { eq: "Right Heavy: x + 1 < 6", tilt: -0.24 },
+    { eq: "3x - 2 = 10 → x = 4 (Balanced!)", tilt: 0 },
+  ];
+  let idx = 0;
+
+  const hb = makeHitBox(2.2, 2.1, 1.4, creation.id, { balance: true });
+  hb.position.set(0, 1.25, 0);
+  root.add(hb);
+
+  return {
+    kind: "balance_scale",
+    hitMeshes: [hb],
+    extraRadius: 0,
+    setHovered() {},
+    trigger() {
+      ensureAudio();
+      idx = (idx + 1) % puzzles.length;
+      const p = puzzles[idx];
+      playArpeggio(p.tilt === 0 ? [523.25, 659.25, 783.99] : [392, 349.23], 0.06, 0.16, "triangle", 0.075);
+      return `Algebra Balance Scale — ${p.eq}`;
+    },
+    step(dt, t) {
+      const targetRot = puzzles[idx].tilt + (puzzles[idx].tilt === 0 ? Math.sin(t * 2.2) * 0.03 : 0);
+      beam.rotation.z += (targetRot - beam.rotation.z) * Math.min(1, dt * 6.5);
+    },
+    dispose() {
+      beam.geometry.dispose();
+      hb.geometry.dispose();
+    },
+  };
+}
+
+// ─── 17. Experiment Yard: Galileo Pendulum Clock Tower ────────────────────────
+function createPendulumTowerController(creation, group) {
+  const root = new THREE.Group();
+  group.add(root);
+
+  const pivot = new THREE.Group();
+  pivot.position.set(0, 2.35, 0.35);
+  root.add(pivot);
+
+  const pv = new Vox(1409);
+  pv.box(0, -14, 0, 0, 0, 0, "#ffe055", 0.7);
+  pv.sphere(0, -15, 0, 2.2, 2.2, 2.2, "#4ce8e0", 1.4);
+  const armMesh = buildVoxelMesh(pv, { scale: 0.085, depthLayer: 5 });
+  pivot.add(armMesh);
+
+  const hb = makeHitBox(1.9, 2.6, 1.6, creation.id, { swing: true });
+  hb.position.set(0, 1.35, 0.2);
+  root.add(hb);
+
+  let amp = 0.42;
+  let omega = 2.6;
+  let lastSign = 1;
+  let chimeBoost = 0;
+
+  return {
+    kind: "pendulum_tower",
+    hitMeshes: [hb],
+    extraRadius: 0,
+    setHovered() {},
+    onInspectFocus() {
+      ensureAudio();
+      amp = 0.78;
+      chimeBoost = 4.0;
+    },
+    trigger() {
+      ensureAudio();
+      amp = amp > 0.65 ? 0.42 : 0.82;
+      omega = omega > 3.0 ? 2.4 : 3.4;
+      chimeBoost = 6.0;
+      const period = ((Math.PI * 2) / omega).toFixed(2);
+      playTone(587.33, 0.14, "sine", 0.07);
+      return `Galileo Pendulum — T = 2π√(L/g) ≈ ${period}s (Amp ${(amp * 57.3).toFixed(0)}°)`;
+    },
+    step(dt, t) {
+      const ang = Math.sin(t * omega) * amp;
+      pivot.rotation.z = ang;
+      const sgn = Math.sign(Math.cos(t * omega));
+      if (chimeBoost > 0) {
+        chimeBoost -= dt;
+        if (sgn !== lastSign && sgn !== 0) {
+          playTone(sgn > 0 ? 523.25 : 440, 0.08, "sine", 0.04);
+        }
+      }
+      lastSign = sgn;
+      amp += (0.42 - amp) * Math.min(1, dt * 0.18);
+    },
+    dispose() {
+      armMesh.geometry.dispose();
+      hb.geometry.dispose();
+    },
+  };
+}
+
+// ─── 18. Experiment Yard: Kinematics Rocket Launch Pad ────────────────────────
+function createRocketPadController(creation, group) {
+  const root = new THREE.Group();
+  group.add(root);
+
+  const rv = new Vox(1429);
+  rv.box(-1, 0, -1, 1, 7, 1, "white");
+  rv.box(0, 8, 0, 0, 10, 0, "#ff5a4f", 1.1);
+  rv.box(-2, 0, 0, -2, 2, 0, "#ff5a4f");
+  rv.box(2, 0, 0, 2, 2, 0, "#ff5a4f");
+  rv.box(0, -1, 0, 0, 0, 0, "#ffe055", 1.8);
+  const rocket = buildVoxelMesh(rv, { scale: 0.09, depthLayer: 5 });
+  rocket.position.set(0, 0.38, 0);
+  root.add(rocket);
+
+  const flameVox = new Vox(1433);
+  flameVox.box(-1, -3, -1, 1, 0, 1, "#ff7426", 2.0);
+  flameVox.box(0, -5, 0, 0, -3, 0, "#ffe055", 2.0);
+  const flame = buildVoxelMesh(flameVox, { scale: 0.09, castShadow: false, depthLayer: 5 });
+  flame.visible = false;
+  rocket.add(flame);
+
+  const hb = makeHitBox(2.1, 2.6, 2.1, creation.id, { ignite: true });
+  hb.position.set(0, 1.3, 0);
+  root.add(hb);
+
+  let flightT = -1;
+
+  return {
+    kind: "rocket_pad",
+    hitMeshes: [hb],
+    extraRadius: 0,
+    setHovered() {},
+    onInspectFocus() {
+      ensureAudio();
+      if (flightT < 0) flightT = 0;
+    },
+    trigger() {
+      ensureAudio();
+      flightT = 0;
+      playBurstNoise(0.28, 0.075);
+      playArpeggio([261.63, 392, 523.25, 783.99], 0.07, 0.2, "sawtooth", 0.06);
+      return "Kinematics Rocket — T-0 Ignition! Tracing h(t) = v₀t - ½gt²!";
+    },
+    step(dt, t) {
+      if (flightT >= 0) {
+        flightT += dt;
+        const dur = 3.2;
+        if (flightT >= dur) {
+          flightT = -1;
+          rocket.position.y = 0.38;
+          flame.visible = false;
+        } else {
+          // Smooth launch + soft retro landing parabola
+          const u = flightT / dur;
+          const height = 11.5 * Math.sin(u * Math.PI);
+          rocket.position.y = 0.38 + height;
+          flame.visible = true;
+          flame.scale.setScalar(0.85 + Math.sin(t * 40) * 0.22);
+        }
+      } else {
+        rocket.position.y = 0.38 + Math.sin(t * 2.0) * 0.02;
+      }
+    },
+    dispose() {
+      rocket.geometry.dispose();
+      flame.geometry.dispose();
+      hb.geometry.dispose();
+    },
+  };
+}
+
+// ─── 19. Experiment Yard: Sine Wave Ferris Wheel ──────────────────────────────
+function createFerrisWheelController(creation, group) {
+  const root = new THREE.Group();
+  group.add(root);
+
+  const hub = new THREE.Group();
+  hub.position.set(0, 2.35, 0);
+  root.add(hub);
+
+  const wv = new Vox(1451);
+  wv.ringAxis("z", 0, 0, -1, 1, 14, 12, "#ff4d78", 1.1);
+  wv.box(-1, -13, 0, 1, 13, 0, "#ffe055", 0.5);
+  wv.box(-13, -1, 0, 13, 1, 0, "#ffe055", 0.5);
+  const wheelMesh = buildVoxelMesh(wv, { scale: 0.095, depthLayer: 4 });
+  hub.add(wheelMesh);
+
+  const gondolaColors = ["#4ce8e0", "#ffe055", "#5ef28c", "#ff5a4f", "#9b7bd4", "#ec8db0"];
+  const gondolas = [];
+  for (let i = 0; i < 6; i++) {
+    const gv = new Vox(1459 + i);
+    gv.box(-1, -2, -1, 1, 0, 1, gondolaColors[i], 1.15);
+    const gm = buildVoxelMesh(gv, { scale: 0.09, depthLayer: 5 });
+    const ang = (i / 6) * Math.PI * 2;
+    const holder = new THREE.Group();
+    holder.position.set(Math.cos(ang) * 1.24, Math.sin(ang) * 1.24, 0);
+    holder.add(gm);
+    hub.add(holder);
+    gondolas.push({ holder, mesh: gm });
+  }
+
+  const hb = makeHitBox(2.9, 3.6, 1.8, creation.id, { spin: true });
+  hb.position.set(0, 2.1, 0);
+  root.add(hb);
+
+  let speedMult = 1;
+  let angle = 0;
+
+  return {
+    kind: "ferris_wheel",
+    hitMeshes: [hb],
+    extraRadius: 0,
+    setHovered() {},
+    trigger() {
+      ensureAudio();
+      speedMult = speedMult === 1 ? 2.2 : speedMult === 2.2 ? 3.5 : 1;
+      playArpeggio([392, 493.88, 587.33], 0.055, 0.14, "triangle", 0.07);
+      return `Sine Ferris Wheel — Speed ${speedMult}x · y(t) = R·sin(ωt) + h`;
+    },
+    step(dt) {
+      angle += dt * 0.65 * speedMult;
+      hub.rotation.z = angle;
+      // Keep hanging gondolas upright!
+      for (const g of gondolas) {
+        g.holder.rotation.z = -angle;
+      }
+    },
+    dispose() {
+      wheelMesh.geometry.dispose();
+      gondolas.forEach((g) => g.mesh.geometry.dispose());
+      hb.geometry.dispose();
+    },
+  };
+}
+
 // ─── Factory Dispatcher ──────────────────────────────────────────────────────
 export function createInteractiveController(creation, group, onEvent = null) {
   const kind = creation?.blueprint?.interaction?.kind;
@@ -2356,6 +2732,18 @@ export function createInteractiveController(creation, group, onEvent = null) {
       return createGravityInverterController(creation, group);
     case "marble_run":
       return createMarbleRunController(creation, group);
+    case "abacus_frame":
+      return createAbacusFrameController(creation, group);
+    case "fraction_stand":
+      return createFractionStandController(creation, group);
+    case "balance_scale":
+      return createBalanceScaleController(creation, group);
+    case "pendulum_tower":
+      return createPendulumTowerController(creation, group);
+    case "rocket_pad":
+      return createRocketPadController(creation, group);
+    case "ferris_wheel":
+      return createFerrisWheelController(creation, group);
     default:
       return null;
   }

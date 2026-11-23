@@ -6,12 +6,14 @@ import url from "node:url";
 import { createServer as createViteServer } from "vite";
 import { checkIslandContentPolicy } from "./src/content_policy";
 import { type AppEnv, resolveRuntimeEnv } from "./src/env_types";
+import { callGeminiWithFallbacks, createGeminiSdkClient } from "./src/gemini_models";
 import { resolveWorldLiveFeeds } from "./src/live_feeds";
 import { chooseMoveWithGeminiFlashLite, validateMinigameRequest } from "./src/minigame_ai";
 import { MultiplayerHub } from "./src/multiplayer_hub";
 import {
   buildSecurityHeaders,
   readBoundedJsonBody,
+  redactSecrets,
   resolveVisitorIdentity,
   safeLogError,
   sanitizePlainText,
@@ -77,6 +79,59 @@ function allowTrafficIncidentReport(ipHash: string): boolean {
   if (cur.count >= 24) return false;
   cur.count++;
   return true;
+}
+
+const geminiAssistBuckets = new Map<string, { windowStart: number; count: number }>();
+function allowGeminiAssist(ipHash: string): boolean {
+  const now = Date.now();
+  if (geminiAssistBuckets.size > 1024) {
+    for (const [k, b] of geminiAssistBuckets.entries()) {
+      if (now - b.windowStart > 60_000) geminiAssistBuckets.delete(k);
+    }
+  }
+  const cur = geminiAssistBuckets.get(ipHash);
+  if (!cur || now - cur.windowStart > 60_000) {
+    geminiAssistBuckets.set(ipHash, { windowStart: now, count: 1 });
+    return true;
+  }
+  if (cur.count >= 20) return false;
+  cur.count++;
+  return true;
+}
+
+function ensureWavBase64(base64Data: string, mimeType?: string): { base64: string; mimeType: string } {
+  const raw = Buffer.from(base64Data, "base64");
+  if (raw.length >= 12 && raw.subarray(0, 4).toString("ascii") === "RIFF") {
+    return { base64: base64Data, mimeType: "audio/wav" };
+  }
+  if (mimeType && /audio\/(mpeg|mp3|ogg|webm|mp4)/i.test(mimeType)) {
+    return { base64: base64Data, mimeType };
+  }
+  const rateMatch = String(mimeType || "").match(/rate=(\d{4,6})/i);
+  const sampleRate = rateMatch ? Math.max(8000, Math.min(96000, Number(rateMatch[1]) || 24000)) : 24000;
+  const numChannels = 1;
+  const bitsPerSample = 16;
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const dataSize = raw.length;
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0, "ascii");
+  header.writeUInt32LE(36 + dataSize, 4);
+  header.write("WAVE", 8, "ascii");
+  header.write("fmt ", 12, "ascii");
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write("data", 36, "ascii");
+  header.writeUInt32LE(dataSize, 40);
+  return {
+    base64: Buffer.concat([header, raw]).toString("base64"),
+    mimeType: "audio/wav",
+  };
 }
 
 function jsonResponse(
@@ -499,6 +554,198 @@ export async function startServer(customPort?: number) {
           },
           200,
           cookieHeaders,
+        );
+      }
+
+      if (url.pathname === "/api/gemini/explain") {
+        if (request.method !== "POST") {
+          return jsonResponse(request, { ok: false, error: "Method not allowed." }, 405);
+        }
+        const csrfErr = verifyMutationSecurity(request);
+        if (csrfErr) {
+          return jsonResponse(request, { ok: false, error: csrfErr }, 403);
+        }
+        const apiKey = env.GEMINI_API_KEY;
+        if (!apiKey) {
+          return jsonResponse(
+            request,
+            { ok: false, error: "Gemini Tutor requires GEMINI_API_KEY." },
+            503,
+          );
+        }
+        const id = await resolveVisitorIdentity(request, env);
+        if (!allowGeminiAssist(id.ipHash)) {
+          return jsonResponse(
+            request,
+            { ok: false, error: "Tutor cooldown active — wait a moment." },
+            429,
+          );
+        }
+        const parsedBody = await readBoundedJsonBody(request, 24_576);
+        if (!parsedBody.ok) {
+          return jsonResponse(request, { ok: false, error: parsedBody.error }, parsedBody.status);
+        }
+        const body = parsedBody.data;
+        const chapterTitle = sanitizePlainText(body.chapterTitle, 120, true) || "Math Lab";
+        const formulaSummary = sanitizePlainText(body.formulaSummary, 240, true);
+        const readout = sanitizePlainText(body.readout, 220, true);
+        const question = sanitizePlainText(body.question, 320, true);
+        const modelPref = sanitizePlainText(body.modelPref, 48, true);
+        const promptCheck = checkIslandContentPolicy(`${chapterTitle} ${question}`);
+        if (!promptCheck.allowed) {
+          return jsonResponse(request, { ok: false, error: promptCheck.reason }, 400);
+        }
+
+        const overrideModels =
+          modelPref === "gemini-2.5-flash" || modelPref === "2.5"
+            ? ["gemini-2.5-flash", "gemini-4-hydrogen", "gemini-3.1-flash-lite"]
+            : modelPref === "gemini-4-hydrogen"
+              ? ["gemini-4-hydrogen", "gemini-2.5-flash", "gemini-3.1-flash-lite"]
+              : undefined;
+
+        const result = await callGeminiWithFallbacks({
+          apiKey,
+          mode: "director",
+          hydrogenModel: env.HYDROGEN_MODEL,
+          hydrogenModels: env.HYDROGEN_MODELS,
+          primaryModel: env.ARGON_MODEL,
+          fallbackModel: env.FALLBACK_MODEL,
+          overrideModels,
+          systemPrompt:
+            "You are the friendly MATH_LAND Interactive Audio Tutor for a pixel-art gaming console created by AARUTO + DIPU-_-. Reply with strict JSON only: {\"explanation\": string, \"keyFormula\": string, \"tryTip\": string}. Keep explanation clear, vivid, accurate, and 2-3 short sentences suitable to read aloud.",
+          userText: [
+            `Chapter: ${chapterTitle}`,
+            formulaSummary ? `Live step breakdown: ${formulaSummary}` : "",
+            readout ? `Current readout: ${readout}` : "",
+            question
+              ? `Student question: ${question}`
+              : "Explain intuitively what is happening in this interactive lab right now and one experiment to try.",
+          ]
+            .filter(Boolean)
+            .join("\n"),
+          temperature: 0.45,
+          thinkingBudget: 512,
+          maxOutputTokens: 2048,
+          maxCascadeMs: 28_000,
+        });
+
+        const explanation = sanitizePlainText(result.json.explanation, 520, true);
+        const keyFormula = sanitizePlainText(result.json.keyFormula, 140, true);
+        const tryTip = sanitizePlainText(result.json.tryTip, 200, true);
+        return jsonResponse(request, {
+          ok: true,
+          explanation: explanation || "Adjust the sliders or drag the canvas to watch the curve and slope respond live.",
+          keyFormula,
+          tryTip,
+          modelUsed: result.modelUsed,
+        });
+      }
+
+      if (url.pathname === "/api/gemini/tts") {
+        if (request.method !== "POST") {
+          return jsonResponse(request, { ok: false, error: "Method not allowed." }, 405);
+        }
+        const csrfErr = verifyMutationSecurity(request);
+        if (csrfErr) {
+          return jsonResponse(request, { ok: false, error: csrfErr }, 403);
+        }
+        const apiKey = env.GEMINI_API_KEY;
+        if (!apiKey) {
+          return jsonResponse(
+            request,
+            { ok: false, error: "Gemini Audio requires GEMINI_API_KEY." },
+            503,
+          );
+        }
+        const id = await resolveVisitorIdentity(request, env);
+        if (!allowGeminiAssist(id.ipHash)) {
+          return jsonResponse(
+            request,
+            { ok: false, error: "Audio cooldown active — wait a moment." },
+            429,
+          );
+        }
+        const parsedBody = await readBoundedJsonBody(request, 12_288);
+        if (!parsedBody.ok) {
+          return jsonResponse(request, { ok: false, error: parsedBody.error }, parsedBody.status);
+        }
+        const text = sanitizePlainText(parsedBody.data.text, 600, true);
+        if (!text) {
+          return jsonResponse(request, { ok: false, error: "Provide text to speak." }, 400);
+        }
+        const requestedVoice = sanitizePlainText(parsedBody.data.voiceName, 32, true);
+        const VALID_TTS_VOICES = new Set(["Puck", "Charon", "Kore", "Fenrir", "Zephyr"]);
+        const safeVoice = VALID_TTS_VOICES.has(requestedVoice) ? requestedVoice : "Kore";
+        const ttsMode = sanitizePlainText(parsedBody.data.ttsMode, 24, true);
+        const ai = createGeminiSdkClient(apiKey);
+        const ttsModels =
+          ttsMode === "3.8"
+            ? ["gemini-3.8-flash-lite-tts", "gemini-2.5-flash-preview-tts", "gemini-3.8-flash-tts"]
+            : ["gemini-2.5-flash-preview-tts", "gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"];
+        const attempts: string[] = [];
+        let lastErr: unknown = null;
+
+        const runTtsAttempt = async (model: string, withSpeechMeta: boolean) => {
+          const part: Record<string, unknown> = withSpeechMeta
+            ? {
+                text,
+                speechMetadata: {
+                  style: "Clear, warm, upbeat interactive math tutor",
+                },
+              }
+            : { text };
+          const response = await ai.models.generateContent({
+            model,
+            contents: [
+              {
+                role: "user",
+                parts: [part],
+              },
+            ],
+            config: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: safeVoice },
+                },
+              },
+            },
+          });
+          const parts = response.candidates?.[0]?.content?.parts || [];
+          return parts.find((p) => p?.inlineData?.data)?.inlineData;
+        };
+
+        for (const model of ttsModels) {
+          const metaStrategies = model.includes("2.5") ? [false] : [true, false];
+          for (const withSpeechMeta of metaStrategies) {
+            try {
+              const inline = await runTtsAttempt(model, withSpeechMeta);
+              if (inline?.data) {
+                const wav = ensureWavBase64(inline.data, inline.mimeType);
+                return jsonResponse(request, {
+                  ok: true,
+                  mimeType: wav.mimeType,
+                  audioBase64: wav.base64,
+                  modelUsed: model,
+                  voiceUsed: safeVoice,
+                });
+              }
+              attempts.push(`${model}(meta=${withSpeechMeta}):no_inline_audio`);
+            } catch (err) {
+              lastErr = err;
+              const msg = redactSecrets(err, [apiKey]);
+              attempts.push(`${model}(meta=${withSpeechMeta}):${msg}`);
+              if (withSpeechMeta && !/speech_?metadata|INVALID_ARGUMENT|400/i.test(msg)) {
+                break;
+              }
+            }
+          }
+        }
+        safeLogError("gemini_tts", attempts.join(" | ") || lastErr, [apiKey]);
+        return jsonResponse(
+          request,
+          { ok: false, error: "Voice synthesizer busy — try again in a moment." },
+          503,
         );
       }
 

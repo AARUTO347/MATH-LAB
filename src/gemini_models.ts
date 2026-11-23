@@ -6,6 +6,7 @@ export function createGeminiSdkClient(apiKey?: string): GoogleGenAI {
   const resolvedKey = apiKey?.trim() || process.env.GEMINI_API_KEY?.trim() || "";
   return new GoogleGenAI({
     apiKey: resolvedKey,
+    apiVersion: "v1beta",
     httpOptions: {
       headers: {
         "User-Agent": "aistudio-build",

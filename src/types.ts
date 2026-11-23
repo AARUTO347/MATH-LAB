@@ -113,7 +113,13 @@ export type InteractionKind =
   | "fireworks_mortar"
   | "tesla_coil"
   | "gravity_inverter"
-  | "marble_run";
+  | "marble_run"
+  | "abacus_frame"
+  | "fraction_stand"
+  | "balance_scale"
+  | "pendulum_tower"
+  | "rocket_pad"
+  | "ferris_wheel";
 
 export interface BlueprintInteraction {
   kind: InteractionKind;

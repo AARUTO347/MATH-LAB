@@ -1310,7 +1310,7 @@ function buildProceduralRoom(creation) {
         return {
           ok: true,
           uiAction: "open_quest_book",
-          message: "Opened the MATH_LAND Quest Book!",
+          message: "Opened the SST-LAB Quest Book!",
         };
       },
     });
@@ -1340,9 +1340,9 @@ function buildProceduralRoom(creation) {
     group.add(tvMesh);
     let tvChannel = 0;
     const TV_CHANNELS = [
-      { title: "CH1: GRAPH STUDIO LIVE", bg: "#171537", fg: "#87e8f4" },
+      { title: "CH1: SST-LAB WORLD ATLAS", bg: "#171537", fg: "#87e8f4" },
       { title: "CH2: EXPRESS RAIL RADAR", bg: "#122b23", fg: "#5ef28c" },
-      { title: "CH3: TURBO CAR TELEMETRY", bg: "#351428", fg: "#ff4d78" },
+      { title: "CH3: MONSOON CLOUD RADAR", bg: "#351428", fg: "#ff4d78" },
       { title: "CH4: AARUTO + DIPU-_-", bg: "#29265f", fg: "#ffe089" },
     ];
     let lastTvRedraw = -1;

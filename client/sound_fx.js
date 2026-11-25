@@ -1,4 +1,4 @@
-// Pure Web Audio API retro console chiptune SFX for MATH_LAND
+// Pure Web Audio API retro console chiptune SFX for SST-LAB
 
 const SFX_STORAGE_KEY = "mathland_sfx_v1";
 

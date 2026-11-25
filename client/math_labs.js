@@ -8,6 +8,8 @@ const DARK_COL = {
   mint: "#5ef28c",
   cream: "#fff8d6",
   violet: "#9d85f5",
+  orange: "#ff9a3c",
+  water: "#3484c8",
   pillBg: "rgba(31, 122, 63, 0.9)",
   tileOff: "#29265f",
 };
@@ -22,6 +24,8 @@ const PAPER_COL = {
   mint: "#117a3b",
   cream: "#1c1a3a",
   violet: "#5844a8",
+  orange: "#c25900",
+  water: "#1a659e",
   pillBg: "rgba(255, 255, 255, 0.94)",
   tileOff: "#dfd8c2",
 };
@@ -29,2215 +33,1258 @@ const PAPER_COL = {
 let COL = { ...DARK_COL };
 
 function applyLabTheme(extras) {
-  const isPaper = extras?.theme === "paper";
-  COL = isPaper ? { ...PAPER_COL } : { ...DARK_COL };
+  COL = extras?.theme === "paper" ? { ...PAPER_COL } : { ...DARK_COL };
 }
 
-// ---------------- Safe Recursive-Descent Math Expression Parser ----------------
-const MATH_FUNCS = {
-  sin: Math.sin,
-  cos: Math.cos,
-  tan: Math.tan,
-  asin: Math.asin,
-  acos: Math.acos,
-  atan: Math.atan,
-  abs: Math.abs,
-  sqrt: Math.sqrt,
-  exp: Math.exp,
-  log: Math.log,
-  ln: Math.log,
-  floor: Math.floor,
-  ceil: Math.ceil,
-  min: Math.min,
-  max: Math.max,
-  pow: Math.pow,
-};
-
-const MATH_CONSTS = {
-  pi: Math.PI,
-  e: Math.E,
-  tau: Math.PI * 2,
-};
-
-function tokenizeExpr(raw) {
-  const src = String(raw || "").trim().toLowerCase();
-  const tokens = [];
-  let i = 0;
-  while (i < src.length) {
-    const ch = src[i];
-    if (/\s/.test(ch)) {
-      i++;
-      continue;
-    }
-    if ((ch >= "0" && ch <= "9") || ch === ".") {
-      let numStr = "";
-      let dotSeen = false;
-      while (i < src.length && ((src[i] >= "0" && src[i] <= "9") || (src[i] === "." && !dotSeen))) {
-        if (src[i] === ".") dotSeen = true;
-        numStr += src[i++];
-      }
-      const val = Number.parseFloat(numStr);
-      if (Number.isFinite(val)) tokens.push({ type: "num", val });
-      continue;
-    }
-    if (/[a-z_]/.test(ch)) {
-      let id = "";
-      while (i < src.length && /[a-z0-9_]/.test(src[i])) {
-        id += src[i++];
-      }
-      tokens.push({ type: "id", val: id });
-      continue;
-    }
-    if ("+-*/^(),".includes(ch)) {
-      tokens.push({ type: "op", val: ch });
-      i++;
-      continue;
-    }
-    i++;
-  }
-  return tokens;
-}
-
-const exprCompileCache = new Map();
-
-export function compileMathExpr(rawExpr) {
-  const key = String(rawExpr || "").trim();
-  if (exprCompileCache.has(key)) return exprCompileCache.get(key);
-  const tokens = tokenizeExpr(key);
-  if (!tokens.length) {
-    const zeroFn = () => Number.NaN;
-    exprCompileCache.set(key, zeroFn);
-    return zeroFn;
-  }
-
-  let pos = 0;
-  const peek = () => tokens[pos] || null;
-  const next = () => tokens[pos++] || null;
-
-  function parsePrimary() {
-    const tok = peek();
-    if (!tok) return () => Number.NaN;
-    if (tok.type === "num") {
-      next();
-      const v = tok.val;
-      return () => v;
-    }
-    if (tok.type === "op" && tok.val === "(") {
-      next();
-      const inner = parseAddSub();
-      if (peek()?.type === "op" && peek().val === ")") next();
-      return inner;
-    }
-    if (tok.type === "id") {
-      next();
-      const name = tok.val;
-      if (peek()?.type === "op" && peek().val === "(" && MATH_FUNCS[name]) {
-        next();
-        const args = [];
-        if (!(peek()?.type === "op" && peek().val === ")")) {
-          args.push(parseAddSub());
-          while (peek()?.type === "op" && peek().val === ",") {
-            next();
-            args.push(parseAddSub());
-          }
-        }
-        if (peek()?.type === "op" && peek().val === ")") next();
-        const fn = MATH_FUNCS[name];
-        return (vars) => fn(...args.map((a) => a(vars)));
-      }
-      if (Object.prototype.hasOwnProperty.call(MATH_CONSTS, name)) {
-        const c = MATH_CONSTS[name];
-        return () => c;
-      }
-      return (vars) => {
-        if (name === "x" || name === "theta" || name === "r") return vars.x;
-        if (name === "t") return vars.t;
-        if (name === "p1" || name === "k" || name === "a") return vars.p1;
-        if (name === "p2" || name === "b") return vars.p2;
-        return Number.NaN;
-      };
-    }
-    next();
-    return () => Number.NaN;
-  }
-
-  function parseUnary() {
-    const tok = peek();
-    if (tok?.type === "op" && (tok.val === "+" || tok.val === "-")) {
-      next();
-      const right = parseUnary();
-      return tok.val === "-" ? (vars) => -right(vars) : right;
-    }
-    return parsePrimary();
-  }
-
-  function parsePow() {
-    let left = parseUnary();
-    while (peek()?.type === "op" && peek().val === "^") {
-      next();
-      const right = parseUnary();
-      const lFn = left;
-      left = (vars) => Math.pow(lFn(vars), right(vars));
-    }
-    return left;
-  }
-
-  function parseMulDiv() {
-    let left = parsePow();
-    while (
-      peek() &&
-      ((peek().type === "op" && (peek().val === "*" || peek().val === "/")) ||
-        peek().type === "id" ||
-        (peek().type === "op" && peek().val === "("))
-    ) {
-      let op = "*";
-      if (peek().type === "op" && (peek().val === "*" || peek().val === "/")) {
-        op = next().val;
-      }
-      const right = parsePow();
-      const lFn = left;
-      left =
-        op === "*"
-          ? (vars) => lFn(vars) * right(vars)
-          : (vars) => lFn(vars) / right(vars);
-    }
-    return left;
-  }
-
-  function parseAddSub() {
-    let left = parseMulDiv();
-    while (peek()?.type === "op" && (peek().val === "+" || peek().val === "-")) {
-      const op = next().val;
-      const right = parseMulDiv();
-      const lFn = left;
-      left =
-        op === "+"
-          ? (vars) => lFn(vars) + right(vars)
-          : (vars) => lFn(vars) - right(vars);
-    }
-    return left;
-  }
-
-  const ast = parseAddSub();
-  if (exprCompileCache.size > 80) exprCompileCache.clear();
-  exprCompileCache.set(key, ast);
-  return ast;
-}
-
-export function evalMathExpr(rawExpr, x = 0, t = 0, p1 = 1, p2 = 0) {
-  try {
-    const fn = compileMathExpr(rawExpr);
-    const val = fn({ x, t, p1, p2 });
-    return Number.isFinite(val) ? val : Number.NaN;
-  } catch {
-    return Number.NaN;
-  }
-}
-
-function drawGrid(ctx, w, h, step = 20, offsetX = 0, offsetY = 0) {
+function drawGrid(ctx, w, h, step = 28) {
   ctx.fillStyle = COL.bg;
   ctx.fillRect(0, 0, w, h);
   ctx.strokeStyle = COL.grid;
   ctx.lineWidth = 1;
-  const cx = w * 0.5 + offsetX;
-  const cy = h * 0.5 + offsetY;
   ctx.beginPath();
-  for (let x = ((cx % step) + step) % step; x < w; x += step) {
+  for (let x = step; x < w; x += step) {
     ctx.moveTo(x, 0);
     ctx.lineTo(x, h);
   }
-  for (let y = ((cy % step) + step) % step; y < h; y += step) {
+  for (let y = step; y < h; y += step) {
     ctx.moveTo(0, y);
     ctx.lineTo(w, y);
   }
   ctx.stroke();
-
-  ctx.strokeStyle = COL.axis;
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(0, cy);
-  ctx.lineTo(w, cy);
-  ctx.moveTo(cx, 0);
-  ctx.lineTo(cx, h);
-  ctx.stroke();
 }
 
-function fact(n) {
-  let r = 1;
-  for (let i = 2; i <= n; i++) r *= i;
-  return r;
-}
-
-function nCr(n, r) {
-  if (r < 0 || r > n) return 0;
-  return Math.round(fact(n) / (fact(r) * fact(n - r)));
-}
-
-function drawArrow(ctx, x0, y0, x1, y1, color, lw = 2.4) {
+function drawTag(ctx, x, y, text, color = COL.gold, bg = COL.grid) {
+  ctx.save();
+  ctx.font = "bold 11px monospace";
+  const padX = 7;
+  const tw = ctx.measureText(text).width;
+  ctx.fillStyle = bg;
   ctx.strokeStyle = color;
-  ctx.fillStyle = color;
-  ctx.lineWidth = lw;
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.lineTo(x1, y1);
-  ctx.stroke();
-  const ang = Math.atan2(y1 - y0, x1 - x0);
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x1 - 8 * Math.cos(ang - 0.45), y1 - 8 * Math.sin(ang - 0.45));
-  ctx.lineTo(x1 - 8 * Math.cos(ang + 0.45), y1 - 8 * Math.sin(ang + 0.45));
-  ctx.closePath();
+  ctx.roundRect(x, y, tw + padX * 2, 20, 5);
   ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x + padX, y + 10.5);
+  ctx.restore();
 }
 
-function drawStatusOverlay(ctx, w, extras) {
-  if (!extras) return;
-  if (extras.missionSolved) {
-    ctx.save();
-    ctx.fillStyle = COL.pillBg;
-    ctx.strokeStyle = COL.mint;
-    ctx.lineWidth = 1.5;
-    ctx.fillRect(w - 116, 8, 108, 22);
-    ctx.strokeRect(w - 116, 8, 108, 22);
-    ctx.fillStyle = COL.cream;
-    ctx.font = "bold 10px monospace";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("MISSION SOLVED", w - 62, 19);
-    ctx.restore();
-  }
+function compassLabelForDeg(deg) {
+  const norm = ((Math.round(deg) % 360) + 360) % 360;
+  const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  return dirs[Math.round(norm / 22.5) % 16];
 }
 
-export function renderChapterLabFrame(ctx, w, h, chapterId, p1, p2, t, extras = {}) {
-  applyLabTheme(extras);
-  const cx = w * 0.5;
-  const cy = h * 0.5;
-  const zoom = Math.max(0.45, Math.min(2.8, Number(extras?.zoom) || 1));
-  const sc = Math.min(w, h) * 0.28 * zoom;
-  let readout = "";
-
-  switch (chapterId) {
-    case "B1": {
-      drawGrid(ctx, w, h, 24);
-      const a = Math.round(p1);
-      const b = Math.round(p2);
-      const sum = a + b;
-      const numY = extras?.expMode ? h * 0.42 : h * 0.5;
-      const toX = (n) => 28 + ((n + 12) / 56) * (w - 56);
-      ctx.strokeStyle = COL.axis;
-      ctx.lineWidth = 2.4;
-      ctx.beginPath();
-      ctx.moveTo(24, numY);
-      ctx.lineTo(w - 24, numY);
-      ctx.stroke();
-
-      for (let tick = -10; tick <= 40; tick += 5) {
-        const tx = toX(tick);
-        ctx.strokeStyle = tick === 0 ? COL.gold : COL.axis;
-        ctx.lineWidth = tick === 0 ? 2 : 1.2;
-        ctx.beginPath();
-        ctx.moveTo(tx, numY - 6);
-        ctx.lineTo(tx, numY + 6);
-        ctx.stroke();
-        ctx.fillStyle = tick === 0 ? COL.gold : COL.cream;
-        ctx.font = "bold 9px monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(String(tick), tx, numY + 18);
-      }
-
-      const x0 = toX(0);
-      const xA = toX(a);
-      const xS = toX(sum);
-      const drawHop = (fx, tx, arcH, col, lbl) => {
-        ctx.strokeStyle = col;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(fx, numY);
-        ctx.quadraticCurveTo((fx + tx) * 0.5, numY - arcH, tx, numY);
-        ctx.stroke();
-        ctx.fillStyle = col;
-        ctx.beginPath();
-        ctx.arc(tx, numY, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.font = "bold 10px monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(lbl, (fx + tx) * 0.5, numY - arcH * 0.62);
-      };
-      drawHop(x0, xA, Math.min(72, 22 + Math.abs(a) * 2), COL.cyan, `${a >= 0 ? "+" : ""}${a}`);
-      drawHop(xA, xS, Math.min(76, 26 + Math.abs(b) * 2.2), b >= 0 ? COL.mint : COL.pink, `${b >= 0 ? "+" : ""}${b}`);
-
-      // Place value blocks for |sum|
-      const absSum = Math.abs(sum);
-      const tens = Math.floor(absSum / 10);
-      const ones = absSum % 10;
-      const baseY = h - 38;
-      ctx.fillStyle = COL.cream;
-      ctx.font = "bold 10px monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(`Result = ${sum} (${tens} tens, ${ones} ones)`, 18, baseY - 6);
-      for (let i = 0; i < Math.min(8, tens); i++) {
-        ctx.fillStyle = COL.gold;
-        ctx.fillRect(18 + i * 24, baseY, 18, 12);
-      }
-      for (let i = 0; i < ones; i++) {
-        ctx.fillStyle = COL.mint;
-        ctx.fillRect(220 + i * 14, baseY + 2, 9, 9);
-      }
-
-      if (extras?.expMode) {
-        const stops = Math.max(0, Math.round(extras?.expBusStops || 0));
-        const pulse = Math.abs(Math.sin(t * 2.4));
-        const busX = xS + Math.sin(t * 2) * 3;
-        ctx.fillStyle = "#ff4d78";
-        ctx.fillRect(busX - 16, numY - 26 - pulse * 3, 32, 16);
-        ctx.fillStyle = "#ffe089";
-        ctx.fillRect(busX - 11, numY - 23 - pulse * 3, 22, 6);
-        ctx.fillStyle = COL.cream;
-        ctx.font = "bold 9px monospace";
-        ctx.textAlign = "right";
-        ctx.fillText(`BUS STOP #${sum} · HOPS: ${stops} · ₹${absSum * 10} FARE`, w - 16, 24);
-        readout = `EXPMT Bus Stop #${sum} · ${a} + (${b}) = ${sum} · ₹10 Notes=${absSum}`;
-      } else {
-        readout = `Number Line: ${a} + (${b}) = ${sum} · Tens=${tens}, Ones=${ones}`;
-      }
-      break;
-    }
-
-    case "B2": {
-      ctx.fillStyle = COL.bg;
-      ctx.fillRect(0, 0, w, h);
-      const b = Math.max(2, Math.round(p2));
-      const a = Math.max(1, Math.round(p1));
-      const filled = Math.min(a, b);
-      const pct = (a / b) * 100;
-      const dec = (a / b).toFixed(3);
-      const px = w * 0.28;
-      const py = cy;
-      const r = Math.min(w, h) * 0.31;
-
-      for (let i = 0; i < b; i++) {
-        const a0 = -Math.PI * 0.5 + (i * Math.PI * 2) / b;
-        const a1 = -Math.PI * 0.5 + ((i + 1) * Math.PI * 2) / b;
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.arc(px, py, r, a0, a1);
-        ctx.closePath();
-        ctx.fillStyle = i < filled ? "#ff8c3a" : COL.tileOff;
-        ctx.fill();
-        ctx.strokeStyle = COL.gold;
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-      if (a > b) {
-        ctx.fillStyle = COL.pink;
-        ctx.font = "bold 11px monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(`+${a - b} extra slice!`, px, py + r + 16);
-      }
-
-      // Percentage progress bar on right
-      const barX = w * 0.55;
-      const barW = w * 0.38;
-      const barY = cy - 18;
-      ctx.fillStyle = COL.grid;
-      ctx.fillRect(barX, barY, barW, 28);
-      ctx.strokeStyle = COL.cyan;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(barX, barY, barW, 28);
-      ctx.fillStyle = pct >= 100 ? COL.gold : COL.mint;
-      ctx.fillRect(barX + 2, barY + 2, Math.min(barW - 4, (barW - 4) * (pct / 100)), 24);
-
-      if (extras?.expMode) {
-        ctx.fillStyle = "rgba(255, 224, 137, 0.22)";
-        ctx.fillRect(barX, barY + 42, barW, 22);
-        ctx.fillStyle = COL.gold;
-        ctx.fillRect(barX, barY + 42, barW * 0.75, 22);
-        ctx.fillStyle = COL.cream;
-        ctx.font = "bold 10px monospace";
-        ctx.textAlign = "left";
-        ctx.fillText(`Target Bakery Box: 3/4 = 75%`, barX, barY + 80);
-      }
-
-      ctx.fillStyle = COL.cream;
-      ctx.font = "bold 14px monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(`${a} / ${b} = ${dec} = ${pct.toFixed(1)}%`, barX, barY - 14);
-      readout = `${extras?.expMode ? "EXPMT Bakery " : ""}Fraction ${a}/${b} = ${dec} = ${pct.toFixed(1)}%`;
-      break;
-    }
-
-    case "B3": {
-      ctx.fillStyle = COL.bg;
-      ctx.fillRect(0, 0, w, h);
-      const hr = p1;
-      const disc = p2;
-      const mrp = Math.round(hr * 100);
-      const saved = Math.round(mrp * (disc / 100));
-      const net = mrp - saved;
-
-      const clkX = w * 0.26;
-      const clkY = cy;
-      const clkR = Math.min(w, h) * 0.3;
-      ctx.strokeStyle = COL.cyan;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(clkX, clkY, clkR, 0, Math.PI * 2);
-      ctx.stroke();
-
-      for (let hTick = 1; hTick <= 12; hTick++) {
-        const ang = (hTick / 12) * Math.PI * 2 - Math.PI * 0.5;
-        ctx.fillStyle = COL.cream;
-        ctx.font = "bold 10px monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(String(hTick), clkX + Math.cos(ang) * (clkR - 14), clkY + Math.sin(ang) * (clkR - 14));
-      }
-      const hAng = ((hr % 12) / 12) * Math.PI * 2 - Math.PI * 0.5;
-      const mAng = ((hr % 1) * Math.PI * 2) - Math.PI * 0.5;
-      drawArrow(ctx, clkX, clkY, clkX + Math.cos(hAng) * clkR * 0.55, clkY + Math.sin(hAng) * clkR * 0.55, COL.gold, 3);
-      drawArrow(ctx, clkX, clkY, clkX + Math.cos(mAng) * clkR * 0.78, clkY + Math.sin(mAng) * clkR * 0.78, COL.pink, 2);
-
-      // Shopping receipt card
-      const rx = w * 0.52;
-      const ry = 28;
-      const rw = w * 0.42;
-      const rh = h - 56;
-      ctx.fillStyle = COL.grid;
-      ctx.strokeStyle = COL.mint;
-      ctx.lineWidth = 2;
-      ctx.fillRect(rx, ry, rw, rh);
-      ctx.strokeRect(rx, ry, rw, rh);
-      ctx.fillStyle = COL.cream;
-      ctx.font = "bold 12px monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(`MRP PRICE : ₹${mrp}`, rx + 14, ry + 32);
-      ctx.fillStyle = COL.pink;
-      ctx.fillText(`DISC ${Math.round(disc)}% : -₹${saved}`, rx + 14, ry + 58);
-      ctx.fillStyle = COL.mint;
-      ctx.fillText(`NET BILL  : ₹${net}`, rx + 14, ry + 86);
-
-      if (extras?.expMode) {
-        const items = Math.max(1, Math.round(extras?.expCartItems || 1));
-        const sub = net * items;
-        const gst = Math.round(sub * 0.05);
-        const total = sub + gst;
-        ctx.fillStyle = COL.gold;
-        ctx.font = "bold 11px monospace";
-        ctx.fillText(`CART QTY  : ${items} item(s)`, rx + 14, ry + 114);
-        ctx.fillText(`5% GST    : +₹${gst}`, rx + 14, ry + 138);
-        ctx.fillStyle = COL.cyan;
-        ctx.fillText(`GRAND TOT : ₹${total}`, rx + 14, ry + 164);
-        readout = `EXPMT Supermarket: ${items}×₹${net} + 5% GST = ₹${total} · Change from ₹2000 = ₹${Math.max(0, 2000 - total)}`;
-      } else {
-        const hh = Math.floor(hr);
-        const mm = Math.round((hr % 1) * 60);
-        readout = `Time ${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")} · MRP ₹${mrp} - ${Math.round(disc)}% = ₹${net}`;
-      }
-      break;
-    }
-
-    case "B4": {
-      ctx.fillStyle = COL.bg;
-      ctx.fillRect(0, 0, w, h);
-      const a = Math.round(p1);
-      const xVal = p2;
-      const lhs = a * xVal + 2;
-      const rhs = 10;
-      const diff = lhs - rhs;
-      const tilt = Math.max(-0.32, Math.min(0.32, diff * 0.032));
-      const balanced = Math.abs(diff) < 0.05;
-
-      // Fulcrum
-      ctx.fillStyle = COL.gold;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy + 16);
-      ctx.lineTo(cx - 24, cy + 78);
-      ctx.lineTo(cx + 24, cy + 78);
-      ctx.closePath();
-      ctx.fill();
-
-      const arm = Math.min(w * 0.34, 175);
-      const lx = cx - Math.cos(tilt) * arm;
-      const ly = cy + 14 - Math.sin(tilt) * arm;
-      const rx = cx + Math.cos(tilt) * arm;
-      const ry = cy + 14 + Math.sin(tilt) * arm;
-
-      ctx.strokeStyle = balanced ? COL.mint : COL.cyan;
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(lx, ly);
-      ctx.lineTo(rx, ry);
-      ctx.stroke();
-
-      // Pans
-      ctx.fillStyle = balanced ? "#1f7a3f" : COL.grid;
-      ctx.strokeStyle = balanced ? COL.mint : COL.pink;
-      ctx.lineWidth = 2;
-      ctx.fillRect(lx - 46, ly - 38, 92, 34);
-      ctx.strokeRect(lx - 46, ly - 38, 92, 34);
-      ctx.fillRect(rx - 40, ry - 38, 80, 34);
-      ctx.strokeRect(rx - 40, ry - 38, 80, 34);
-
-      if (extras?.expMode) {
-        for (let i = 0; i < Math.min(6, a); i++) {
-          ctx.fillStyle = COL.gold;
-          ctx.fillRect(lx - 40 + i * 13, ly - 54, 10, 12);
-        }
-        for (let i = 0; i < 5; i++) {
-          ctx.fillStyle = COL.cyan;
-          ctx.fillRect(rx - 32 + i * 13, ry - 54, 10, 12);
-        }
-      }
-
-      ctx.fillStyle = COL.cream;
-      ctx.font = "bold 12px monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(`${a}x+2=${lhs.toFixed(1)}`, lx, ly - 21);
-      ctx.fillText(`RHS = 10`, rx, ry - 21);
-      readout = `Equation ${a}x + 2 = 10 · With x=${xVal.toFixed(1)} -> LHS=${lhs.toFixed(1)} (${balanced ? "BALANCED!" : diff > 0 ? "LEFT HEAVY" : "RIGHT HEAVY"})`;
-      break;
-    }
-
-    case "B5": {
-      ctx.fillStyle = COL.bg;
-      ctx.fillRect(0, 0, w, h);
-      const L = Math.max(2, Math.round(p1));
-      const W = Math.max(2, Math.round(p2));
-      const area = L * W;
-      const perim = 2 * (L + W);
-      const tilePx = Math.min(Math.floor((w * 0.56) / L), Math.floor((h - 56) / W), 36);
-      const gx = w * 0.08;
-      const gy = cy - (W * tilePx) * 0.5;
-
-      for (let r = 0; r < W; r++) {
-        for (let c = 0; c < L; c++) {
-          const isEdge = r === 0 || c === 0 || r === W - 1 || c === L - 1;
-          ctx.fillStyle = isEdge ? "rgba(94, 242, 140, 0.38)" : "rgba(135, 232, 244, 0.28)";
-          ctx.strokeStyle = COL.cyan;
-          ctx.lineWidth = 1.5;
-          ctx.fillRect(gx + c * tilePx, gy + r * tilePx, tilePx - 2, tilePx - 2);
-          ctx.strokeRect(gx + c * tilePx, gy + r * tilePx, tilePx - 2, tilePx - 2);
-        }
-      }
-      ctx.strokeStyle = COL.gold;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(gx - 2, gy - 2, L * tilePx + 2, W * tilePx + 2);
-
-      const infoX = gx + L * tilePx + 24;
-      ctx.fillStyle = COL.cream;
-      ctx.font = "bold 13px monospace";
-      ctx.textAlign = "left";
-      ctx.fillText(`Length L = ${L} m`, infoX, cy - 28);
-      ctx.fillText(`Width  W = ${W} m`, infoX, cy - 6);
-      ctx.fillStyle = COL.mint;
-      ctx.fillText(`Area = ${L}×${W} = ${area} tiles`, infoX, cy + 20);
-      ctx.fillStyle = COL.gold;
-      ctx.fillText(`Perim = 2(${L}+${W}) = ${perim} m`, infoX, cy + 44);
-
-      if (extras?.expMode) {
-        const tileCost = area * 50;
-        const fenceCost = perim * 25;
-        ctx.fillStyle = COL.pink;
-        ctx.fillText(`Floor ₹${tileCost} + Fence ₹${fenceCost}`, infoX, cy + 72);
-        readout = `EXPMT Floor Tiler: ${area} tiles (₹${tileCost}) · Fence ${perim}m (₹${fenceCost})`;
-      } else {
-        readout = `Grid ${L} × ${W} · Area = ${area} sq units · Perimeter = ${perim} m`;
-      }
-      break;
-    }
-
-    case "00": {
-      drawGrid(ctx, w, h, 24);
-      const sh = p1;
-      const sy = p2;
-      const pulse = 1 + Math.sin(t * 2.2) * 0.05;
-      const corners = [
-        [0, 0],
-        [1, 0],
-        [1, 1],
-        [0, 1],
-      ].map(([x, y]) => {
-        const tx = (x + sh * y) * pulse;
-        const ty = y * sy * pulse;
-        return [cx + tx * sc * 0.72, cy - ty * sc * 0.72];
-      });
-      ctx.fillStyle = "rgba(135, 232, 244, 0.2)";
-      ctx.strokeStyle = COL.cyan;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      corners.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      drawArrow(ctx, cx, cy, corners[1][0], corners[1][1], COL.pink, 2.5);
-      drawArrow(ctx, cx, cy, corners[3][0], corners[3][1], COL.gold, 2.5);
-      const det = sy.toFixed(2);
-      readout = `Matrix [[1, ${sh.toFixed(2)}], [0, ${sy.toFixed(2)}]] · det = ${det}`;
-      break;
-    }
-
-    case "01": {
-      drawGrid(ctx, w, h, 24);
-      const n = Math.max(3, Math.round(p1));
-      const baseRad = ((p2 + t * 18) * Math.PI) / 180;
-      const R = sc * 1.1;
-      ctx.strokeStyle = COL.axis;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(cx, cy, R, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.strokeStyle = COL.cyan;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (let k = 0; k <= n; k++) {
-        const a = baseRad + (k * Math.PI * 2) / n;
-        const px = cx + Math.cos(a) * R;
-        const py = cy - Math.sin(a) * R;
-        if (k === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      for (let k = 0; k < n; k++) {
-        const a = baseRad + (k * Math.PI * 2) / n;
-        const px = cx + Math.cos(a) * R;
-        const py = cy - Math.sin(a) * R;
-        ctx.fillStyle = k === 0 ? COL.pink : COL.gold;
-        ctx.beginPath();
-        ctx.arc(px, py, 4.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      readout = `z^${n} = 1 · θ₀ = ${Math.round(p2)}° · ${n} roots on |z|=1`;
-      break;
-    }
-
-    case "02": {
-      drawGrid(ctx, w, h, 24);
-      const a1 = (p1 * Math.PI) / 180;
-      const a2 = (p2 * Math.PI) / 180;
-      const len = sc * 0.95;
-      const ax = Math.cos(a1) * len;
-      const ay = Math.sin(a1) * len;
-      const bx = Math.cos(a2) * len;
-      const by = Math.sin(a2) * len;
-      ctx.fillStyle = "rgba(255, 224, 137, 0.22)";
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + ax, cy - ay);
-      ctx.lineTo(cx + ax + bx, cy - ay - by);
-      ctx.lineTo(cx + bx, cy - by);
-      ctx.closePath();
-      ctx.fill();
-      drawArrow(ctx, cx, cy, cx + ax, cy - ay, COL.pink, 2.5);
-      drawArrow(ctx, cx, cy, cx + bx, cy - by, COL.cyan, 2.5);
-      const det = Math.sin(a2 - a1);
-      readout = `det([v₁, v₂]) = sin(${Math.round(p2 - p1)}°) = ${det.toFixed(3)} ${Math.abs(det) < 0.08 ? "(SINGULAR!)" : "(INVERTIBLE)"}`;
-      break;
-    }
-
-    case "03": {
-      ctx.fillStyle = COL.bg;
-      ctx.fillRect(0, 0, w, h);
-      const n = Math.max(3, Math.min(8, Math.round(p1)));
-      const r = Math.max(1, Math.min(n, Math.round(p2)));
-      const rad = Math.min(w, h) * 0.28;
-      ctx.strokeStyle = COL.grid;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-      ctx.stroke();
-      for (let i = 0; i < n; i++) {
-        const a = t * 0.45 + (i * Math.PI * 2) / n - Math.PI * 0.5;
-        const x = cx + Math.cos(a) * rad;
-        const y = cy + Math.sin(a) * rad;
-        const chosen = i < r;
-        ctx.fillStyle = chosen ? COL.pink : COL.violet;
-        ctx.beginPath();
-        ctx.arc(x, y, chosen ? 11 : 8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = COL.cream;
-        ctx.font = "bold 10px monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(String(i + 1), x, y);
-      }
-      const perm = Math.round(fact(n) / fact(n - r));
-      const comb = nCr(n, r);
-      const circ = Math.round(fact(n - 1));
-      readout = `${n}P${r} = ${perm} · ${n}C${r} = ${comb} · Circular (${n}-1)! = ${circ}`;
-      break;
-    }
-
-    case "04": {
-      ctx.fillStyle = COL.bg;
-      ctx.fillRect(0, 0, w, h);
-      const rows = Math.max(3, Math.min(9, Math.round(p1)));
-      const modK = Math.max(2, Math.round(p2));
-      const rowH = (h - 24) / rows;
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c <= r; c++) {
-          const val = nCr(r, c);
-          const x = cx + (c - r * 0.5) * Math.min(28, (w - 30) / rows);
-          const y = 18 + r * rowH;
-          const hit = val % modK !== 0;
-          ctx.fillStyle = hit ? COL.pink : COL.grid;
-          ctx.fillRect(x - 10, y - 8, 20, 15);
-          ctx.fillStyle = hit ? COL.cream : COL.cyan;
-          ctx.font = "bold 9px monospace";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(String(val), x, y);
-        }
-      }
-      readout = `Pascal Row ${rows - 1} · Row Sum = 2^${rows - 1} = ${2 ** (rows - 1)} · Mod ${modK}`;
-      break;
-    }
-
-    case "05": {
-      ctx.fillStyle = COL.bg;
-      ctx.fillRect(0, 0, w, h);
-      const r = p1;
-      const n = Math.max(4, Math.round(p2));
-      const padX = 24;
-      const barW = Math.max(6, (w - padX * 2) / n - 4);
-      let sum = 0;
-      const vals = [];
-      let maxAbs = 1;
-      for (let i = 0; i < n; i++) {
-        const term = Math.pow(r, i);
-        sum += term;
-        vals.push(term);
-        if (Math.abs(term) > maxAbs) maxAbs = Math.abs(term);
-      }
-      const zeroY = h * 0.62;
-      ctx.strokeStyle = COL.axis;
-      ctx.beginPath();
-      ctx.moveTo(padX, zeroY);
-      ctx.lineTo(w - padX, zeroY);
-      ctx.stroke();
-      vals.forEach((v, i) => {
-        const bh = (v / maxAbs) * (h * 0.42);
-        const x = padX + i * (barW + 4);
-        ctx.fillStyle = v >= 0 ? COL.mint : COL.pink;
-        ctx.fillRect(x, v >= 0 ? zeroY - bh : zeroY, barW, Math.abs(bh));
-      });
-      const sInf = Math.abs(r) < 1 ? (1 / (1 - r)).toFixed(3) : "∞ (Diverges)";
-      readout = `GP r=${r.toFixed(2)}, N=${n} · Sₙ=${sum.toFixed(3)} · S∞=${sInf}`;
-      break;
-    }
-
-    case "06": {
-      ctx.fillStyle = COL.bg;
-      ctx.fillRect(0, 0, w, h);
-      const p = p1;
-      const n = Math.max(4, Math.round(p2));
-      const probs = [];
-      let maxP = 0.05;
-      for (let k = 0; k <= n; k++) {
-        const pk = nCr(n, k) * Math.pow(p, k) * Math.pow(1 - p, n - k);
-        probs.push(pk);
-        if (pk > maxP) maxP = pk;
-      }
-      const pad = 20;
-      const bw = Math.max(5, (w - pad * 2) / (n + 1) - 3);
-      const activeK = Math.floor((t * 3) % (n + 1));
-      const trials = extras?.expMode ? extras?.expTrials : null;
-      const empTotal = trials?.totalRuns || 0;
-
-      probs.forEach((pk, k) => {
-        const bh = (pk / maxP) * (h - 46);
-        const x = pad + k * (bw + 3);
-        ctx.fillStyle = k === activeK ? COL.gold : COL.cyan;
-        ctx.fillRect(x, h - 22 - bh, bw, bh);
-        if (extras?.expMode && empTotal > 0 && Array.isArray(trials.counts)) {
-          const empP = (trials.counts[k] || 0) / empTotal;
-          const eh = Math.min(h - 42, (empP / maxP) * (h - 46));
-          ctx.fillStyle = "rgba(255, 77, 120, 0.72)";
-          ctx.fillRect(x + 2, h - 22 - eh, Math.max(3, bw - 4), eh);
-        }
-      });
-      const muX = pad + n * p * (bw + 3) + bw * 0.5;
-      ctx.strokeStyle = COL.pink;
-      ctx.lineWidth = 1.6;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(muX, 14);
-      ctx.lineTo(muX, h - 16);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      const mean = (n * p).toFixed(2);
-      const sd = Math.sqrt(n * p * (1 - p)).toFixed(2);
-      if (extras?.expMode) {
-        readout = `EXPMT Live Dice/Coins: ${empTotal} rolls vs Binomial B(${n}, ${p.toFixed(2)}) · μ=${mean}`;
-      } else {
-        readout = `Binomial B(${n}, ${p.toFixed(2)}) · Mean μ=${mean} · σ=${sd}`;
-      }
-      break;
-    }
-
-    case "07": {
-      drawGrid(ctx, w, h, 24);
-      const freq = p1;
-      const amp = p2;
-      if (extras?.expMode) {
-        const deg = Math.max(15, Math.min(78, 15 + freq * 13));
-        const rad = (deg * Math.PI) / 180;
-        const heightM = 12 * amp;
-        const shadowM = heightM / Math.tan(rad);
-        const baseY = h * 0.8;
-        const towerX = w * 0.25;
-        const towerH = Math.min(h * 0.54, heightM * 12);
-        const shadowPx = Math.min(w * 0.62, shadowM * 12);
-        ctx.strokeStyle = COL.axis;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(30, baseY);
-        ctx.lineTo(w - 30, baseY);
-        ctx.stroke();
-        ctx.fillStyle = COL.cyan;
-        ctx.fillRect(towerX - 10, baseY - towerH, 20, towerH);
-        ctx.strokeStyle = COL.gold;
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(towerX, baseY);
-        ctx.lineTo(towerX + shadowPx, baseY);
-        ctx.stroke();
-        ctx.strokeStyle = COL.pink;
-        ctx.setLineDash([5, 4]);
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(towerX - 24, baseY - towerH - 20);
-        ctx.lineTo(towerX + shadowPx, baseY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = COL.gold;
-        ctx.beginPath();
-        ctx.arc(towerX - 28, baseY - towerH - 26, 12, 0, Math.PI * 2);
-        ctx.fill();
-        readout = `EXPMT Sun Clinometer: θ=${deg.toFixed(1)}° · Height=${heightM.toFixed(1)}m · Shadow=${shadowM.toFixed(1)}m (tanθ=${Math.tan(rad).toFixed(2)})`;
-        break;
-      }
-      const r = Math.min(w, h) * 0.24;
-      const ux = w * 0.24;
-      const ang = t * freq * 1.4;
-      ctx.strokeStyle = COL.axis;
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.arc(ux, cy, r, 0, Math.PI * 2);
-      ctx.stroke();
-      const px = ux + Math.cos(ang) * r * amp;
-      const py = cy - Math.sin(ang) * r * amp;
-      drawArrow(ctx, ux, cy, px, py, COL.gold, 2.2);
-      ctx.strokeStyle = COL.cyan;
-      ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      const waveStart = ux + r + 16;
-      for (let x = waveStart; x < w - 12; x += 3) {
-        const wy = cy - Math.sin(ang - (x - waveStart) * 0.045 * freq) * r * amp;
-        if (x === waveStart) ctx.moveTo(x, wy);
-        else ctx.lineTo(x, wy);
-      }
-      ctx.stroke();
-      ctx.strokeStyle = COL.pink;
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.lineTo(waveStart, py);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      readout = `y = ${amp.toFixed(2)}·sin(${freq.toFixed(2)}t) · sin=${Math.sin(ang).toFixed(2)}, cos=${Math.cos(ang).toFixed(2)}`;
-      break;
-    }
-
-    case "08": {
-      drawGrid(ctx, w, h, 24);
-      const l1 = 1.05;
-      const l2 = 0.95;
-      let tx = p1;
-      let ty = p2;
-      const maxR = l1 + l2 - 0.05;
-      const dist = Math.hypot(tx, ty);
-      if (dist > maxR) {
-        tx = (tx / dist) * maxR;
-        ty = (ty / dist) * maxR;
-      }
-      const d = Math.max(0.2, Math.hypot(tx, ty));
-      const cosQ2 = Math.max(-1, Math.min(1, (d * d - l1 * l1 - l2 * l2) / (2 * l1 * l2)));
-      const q2 = Math.acos(cosQ2);
-      const q1 = Math.atan2(ty, tx) - Math.atan2(l2 * Math.sin(q2), l1 + l2 * cosQ2);
-      const s = Math.min(w, h) * 0.3;
-      const ox = cx - w * 0.14;
-      const oy = cy + h * 0.14;
-      const jx = ox + Math.cos(q1) * l1 * s;
-      const jy = oy - Math.sin(q1) * l1 * s;
-      const ex = jx + Math.cos(q1 + q2) * l2 * s;
-      const ey = jy - Math.sin(q1 + q2) * l2 * s;
-      ctx.strokeStyle = COL.cyan;
-      ctx.lineWidth = 6;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(ox, oy);
-      ctx.lineTo(jx, jy);
-      ctx.lineTo(ex, ey);
-      ctx.stroke();
-      ctx.fillStyle = COL.pink;
-      ctx.beginPath();
-      ctx.arc(ex, ey, 6, 0, Math.PI * 2);
-      ctx.fill();
-      readout = `IK Joint θ₁=${((q1 * 180) / Math.PI).toFixed(1)}° · θ₂=arccos(${cosQ2.toFixed(2)})=${((q2 * 180) / Math.PI).toFixed(1)}°`;
-      break;
-    }
-
-    case "09": {
-      drawGrid(ctx, w, h, 24);
-      const bx0 = -0.8;
-      const bx1 = 0.8;
-      const by = -0.45;
-      const ax = p1;
-      const ay = by + p2;
-      const pt = (ux, uy) => [cx + ux * sc * 1.15, cy - uy * sc * 1.15];
-      const A = pt(ax, ay);
-      const B = pt(bx0, by);
-      const C = pt(bx1, by);
-      if (extras?.expMode) {
-        ctx.fillStyle = COL.violet;
-        ctx.fillRect(0, B[1], B[0] - 8, h - B[1]);
-        ctx.fillRect(C[0] + 8, C[1], w - C[0], h - C[1]);
-        ctx.strokeStyle = COL.cyan;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(B[0] - 24, B[1]);
-        ctx.lineTo(C[0] + 24, C[1]);
-        ctx.stroke();
-      }
-      ctx.fillStyle = "rgba(255, 224, 137, 0.15)";
-      ctx.strokeStyle = COL.gold;
-      ctx.lineWidth = 2.4;
-      ctx.beginPath();
-      ctx.moveTo(A[0], A[1]);
-      ctx.lineTo(B[0], B[1]);
-      ctx.lineTo(C[0], C[1]);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      if (extras?.expMode) {
-        const loadY = 12 + Math.abs(Math.sin(t * 2.5)) * 18;
-        drawArrow(ctx, A[0], A[1] - 30, A[0], A[1] - 4, COL.pink, 3);
-        ctx.fillStyle = COL.pink;
-        ctx.font = "bold 10px monospace";
-        ctx.textAlign = "center";
-        ctx.fillText(`LOAD ${Math.round(loadY * 10)}N`, A[0], A[1] - 38);
-      }
-      ctx.fillStyle = COL.pink;
-      ctx.beginPath();
-      ctx.arc(A[0], A[1], 5, 0, Math.PI * 2);
-      ctx.fill();
-      const sideA = Math.hypot(bx1 - bx0, 0);
-      const sideB = Math.hypot(ax - bx1, p2);
-      const sideC = Math.hypot(ax - bx0, p2);
-      const s = 0.5 * (sideA + sideB + sideC);
-      const area = Math.sqrt(Math.max(0, s * (s - sideA) * (s - sideB) * (s - sideC)));
-      const inR = area / Math.max(0.01, s);
-      const circR = (sideA * sideB * sideC) / Math.max(0.01, 4 * area);
-      readout = `${extras?.expMode ? "EXPMT Bridge Truss · " : ""}Sides (${sideA.toFixed(2)}, ${sideB.toFixed(2)}, ${sideC.toFixed(2)}) · Area=${area.toFixed(2)} · r=${inR.toFixed(2)}, R=${circR.toFixed(2)}`;
-      break;
-    }
-
-    case "10": {
-      drawGrid(ctx, w, h, 24);
-      const m = p1;
-      const c = p2;
-      if (extras?.expMode) {
-        const slopeM = Math.max(0.15, Math.min(1.6, Math.abs(m) + 0.25));
-        const xLeft = 48;
-        const yLeft = Math.max(40, cy - slopeM * 70 + c * 15);
-        const xRight = w - 48;
-        const yRight = h * 0.78;
-        ctx.strokeStyle = COL.gold;
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.moveTo(xLeft, yLeft);
-        ctx.lineTo(xRight, yRight);
-        ctx.stroke();
-        const frac = (t * (0.35 + slopeM * 0.45)) % 1;
-        const cxCar = xLeft + (xRight - xLeft) * frac;
-        const cyCar = yLeft + (yRight - yLeft) * frac;
-        ctx.fillStyle = COL.pink;
-        ctx.fillRect(cxCar - 12, cyCar - 14, 24, 12);
-        ctx.fillStyle = COL.cyan;
-        ctx.beginPath();
-        ctx.arc(cxCar - 7, cyCar, 4, 0, Math.PI * 2);
-        ctx.arc(cxCar + 7, cyCar, 4, 0, Math.PI * 2);
-        ctx.fill();
-        const accel = (9.8 * Math.sin(Math.atan(slopeM))).toFixed(2);
-        readout = `EXPMT Galileo Ramp: slope m=${slopeM.toFixed(2)} · Accel a=${accel} m/s²`;
-        break;
-      }
-      const x1 = -2.4;
-      const x2 = 2.4;
-      const y1 = m * x1 + c;
-      const y2 = m * x2 + c;
-      const toPx = (x, y) => [cx + x * sc * 0.65, cy - y * sc * 0.65];
-      const P1 = toPx(x1, y1);
-      const P2 = toPx(x2, y2);
-      ctx.strokeStyle = COL.gold;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(P1[0], P1[1]);
-      ctx.lineTo(P2[0], P2[1]);
-      ctx.stroke();
-      const samples = [
-        [-1.1, 0.9, 1],
-        [-0.7, 1.2, 1],
-        [-1.4, 0.2, 1],
-        [1.1, -0.8, -1],
-        [0.8, -1.1, -1],
-        [1.3, -0.1, -1],
-      ];
-      let correct = 0;
-      samples.forEach(([sx, sy, cls]) => {
-        const pred = sy >= m * sx + c ? 1 : -1;
-        if (pred === cls) correct++;
-        const [px, py] = toPx(sx, sy);
-        ctx.fillStyle = cls > 0 ? COL.cyan : COL.pink;
-        ctx.beginPath();
-        ctx.arc(px, py, 5, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      const dist0 = Math.abs(c) / Math.hypot(m, 1);
-      readout = `y = ${m.toFixed(1)}x + ${c.toFixed(1)} · Origin Dist d=${dist0.toFixed(2)} · Classifier ${correct}/6`;
-      break;
-    }
-
-    case "11": {
-      drawGrid(ctx, w, h, 24);
-      const r1 = p1 * sc * 0.72;
-      const r2 = sc * 0.56;
-      const d = p2 * sc * 0.72;
-      const c1x = cx - d * 0.45;
-      const c2x = cx + d * 0.55;
-      ctx.strokeStyle = COL.cyan;
-      ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      ctx.arc(c1x, cy, r1, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.strokeStyle = COL.pink;
-      ctx.beginPath();
-      ctx.arc(c2x, cy, r2, 0, Math.PI * 2);
-      ctx.stroke();
-      const radX = (c1x + c2x) * 0.5 + (r1 * r1 - r2 * r2) / Math.max(1, 2 * d);
-      ctx.strokeStyle = COL.gold;
-      ctx.setLineDash([5, 4]);
-      ctx.beginPath();
-      ctx.moveTo(radX, 14);
-      ctx.lineTo(radX, h - 14);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      const sumR = p1 + 0.78;
-      const status = Math.abs(p2 - sumR) < 0.08 ? "Tangent" : p2 < sumR ? "Intersecting" : "Disjoint";
-      readout = `R₁=${p1.toFixed(2)}, d=${p2.toFixed(2)} · Radical Axis Active · ${status}`;
-      break;
-    }
-
-    case "12": {
-      drawGrid(ctx, w, h, 24);
-      if (extras?.expMode) {
-        const focalPx = Math.max(24, p2 * sc * 0.45);
-        const fx = cx - w * 0.22 + focalPx;
-        const vertexX = cx - w * 0.22;
-        ctx.strokeStyle = COL.cyan;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        for (let dy = -h * 0.36; dy <= h * 0.36; dy += 6) {
-          const mx = vertexX + (dy * dy) / (4 * focalPx);
-          if (dy === -h * 0.36) ctx.moveTo(mx, cy + dy);
-          else ctx.lineTo(mx, cy + dy);
-        }
-        ctx.stroke();
-        [-65, -35, 35, 65].forEach((dy) => {
-          const hitX = vertexX + (dy * dy) / (4 * focalPx);
-          ctx.strokeStyle = COL.gold;
-          ctx.lineWidth = 1.6;
-          ctx.beginPath();
-          ctx.moveTo(w - 14, cy + dy);
-          ctx.lineTo(hitX, cy + dy);
-          ctx.lineTo(fx, cy);
-          ctx.stroke();
-        });
-        ctx.fillStyle = COL.pink;
-        ctx.beginPath();
-        ctx.arc(fx, cy, 6 + Math.sin(t * 5) * 1.5, 0, Math.PI * 2);
-        ctx.fill();
-        readout = `EXPMT Solar Mirror Focus f=${(focalPx / 40).toFixed(2)}m · Parallel rays converge at Focus F!`;
-        break;
-      }
-      const e = p1;
-      const semiP = p2;
-      ctx.strokeStyle = COL.mint;
-      ctx.lineWidth = 2.3;
-      ctx.beginPath();
-      let started = false;
-      for (let a = 0; a <= Math.PI * 2 + 0.05; a += 0.03) {
-        const denom = 1 + e * Math.cos(a);
-        if (Math.abs(denom) < 0.12) {
-          started = false;
-          continue;
-        }
-        const rr = (e * semiP) / denom;
-        if (Math.abs(rr) > 4.2) {
-          started = false;
-          continue;
-        }
-        const px = cx + rr * Math.cos(a) * sc * 0.65;
-        const py = cy - rr * Math.sin(a) * sc * 0.65;
-        if (!started) {
-          ctx.moveTo(px, py);
-          started = true;
-        } else {
-          ctx.lineTo(px, py);
-        }
-      }
-      ctx.stroke();
-      ctx.fillStyle = COL.gold;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
-      ctx.fill();
-      const kind = e < 0.05 ? "Circle" : e < 0.98 ? "Ellipse" : e <= 1.02 ? "Parabola" : "Hyperbola";
-      readout = `Conic: ${kind} · Eccentricity e=${e.toFixed(2)} · latus p=${semiP.toFixed(2)}`;
-      break;
-    }
-
-    case "13": {
-      drawGrid(ctx, w, h, 24);
-      if (extras?.expMode) {
-        const pivX = w * 0.28;
-        const pivY = 26;
-        const lenPx = Math.min(h * 0.62, 110);
-        const theta = Math.sin(t * 2.2) * (0.45 + Math.abs(p1) * 0.25);
-        const bx = pivX + Math.sin(theta) * lenPx;
-        const by = pivY + Math.cos(theta) * lenPx;
-        ctx.strokeStyle = COL.axis;
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(pivX, pivY);
-        ctx.lineTo(bx, by);
-        ctx.stroke();
-        ctx.fillStyle = COL.gold;
-        ctx.beginPath();
-        ctx.arc(bx, by, 12, 0, Math.PI * 2);
-        ctx.fill();
-        const vel = Math.cos(t * 2.2) * 35;
-        drawArrow(ctx, bx, by, bx + vel, by - Math.sin(theta) * vel * 0.4, COL.pink, 2.5);
-        readout = `EXPMT Pendulum Speedometer: θ=${(theta * 57.3).toFixed(1)}° · Tangential Velocity v=${vel.toFixed(1)} cm/s`;
-        break;
-      }
-      const f = (x) => 0.28 * x * x * x - 0.85 * x;
-      const df = (x) => 0.84 * x * x - 0.85;
-      const toPx = (x, y) => [cx + x * sc * 0.62, cy - y * sc * 0.62];
-      ctx.strokeStyle = COL.cyan;
-      ctx.lineWidth = 2.3;
-      ctx.beginPath();
-      for (let x = -2.5; x <= 2.5; x += 0.06) {
-        const [px, py] = toPx(x, f(x));
-        if (x === -2.5) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      const x0 = p1;
-      const dx = p2;
-      const slope = df(x0);
-      const [px0, py0] = toPx(x0, f(x0));
-      const [tx1, ty1] = toPx(x0 - 1.2, f(x0) - slope * 1.2);
-      const [tx2, ty2] = toPx(x0 + 1.2, f(x0) + slope * 1.2);
-      ctx.strokeStyle = COL.pink;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(tx1, ty1);
-      ctx.lineTo(tx2, ty2);
-      ctx.stroke();
-      const [sx2, sy2] = toPx(x0 + dx, f(x0 + dx));
-      ctx.fillStyle = COL.gold;
-      ctx.beginPath();
-      ctx.arc(px0, py0, 5, 0, Math.PI * 2);
-      ctx.arc(sx2, sy2, 4, 0, Math.PI * 2);
-      ctx.fill();
-      readout = `f(${x0.toFixed(2)})=${f(x0).toFixed(2)} · f'(x)=${slope.toFixed(3)} · Δx=${dx.toFixed(2)}`;
-      break;
-    }
-
-    case "14": {
-      drawGrid(ctx, w, h, 24);
-      const N = Math.max(4, Math.round(p1));
-      const b = p2;
-      const fn = (x) => Math.sin(x) * 0.9 + 0.55;
-      const step = b / N;
-      const toPx = (x, y) => [w * 0.14 + (x / 3.2) * (w * 0.72), h * 0.78 - y * (h * 0.42)];
-      let riemann = 0;
-      for (let i = 0; i < N; i++) {
-        const xm = (i + 0.5) * step;
-        const val = fn(xm);
-        riemann += val * step;
-        const [rx0, ry0] = toPx(i * step, val);
-        const [rx1, base] = toPx((i + 1) * step, 0);
-        ctx.fillStyle = "rgba(94, 242, 140, 0.28)";
-        ctx.strokeStyle = COL.mint;
-        ctx.lineWidth = 1;
-        ctx.fillRect(rx0, ry0, Math.max(2, rx1 - rx0 - 1), base - ry0);
-        ctx.strokeRect(rx0, ry0, Math.max(2, rx1 - rx0 - 1), base - ry0);
-      }
-      ctx.strokeStyle = COL.gold;
-      ctx.lineWidth = 2.4;
-      ctx.beginPath();
-      for (let x = 0; x <= 3.15; x += 0.05) {
-        const [px, py] = toPx(x, fn(x));
-        if (x === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      const trueArea = 0.9 * (1 - Math.cos(b)) + 0.55 * b;
-      const err = Math.abs(riemann - trueArea);
-      if (extras?.expMode) {
-        const flightT = (t * 0.7) % 1;
-        const rocketY = h * 0.78 - flightT * (h * 0.58) * Math.min(1, b / 2.5);
-        const rx = w * 0.9;
-        ctx.fillStyle = COL.pink;
-        ctx.fillRect(rx - 6, rocketY - 18, 12, 20);
-        ctx.fillStyle = COL.gold;
-        ctx.beginPath();
-        ctx.moveTo(rx - 6, rocketY + 2);
-        ctx.lineTo(rx + 6, rocketY + 2);
-        ctx.lineTo(rx, rocketY + 14 + Math.random() * 6);
-        ctx.fill();
-        readout = `EXPMT Rocket Altitude = ∫v(t)dt = ${trueArea.toFixed(2)} km (b=${b.toFixed(2)}s)`;
-      } else {
-        readout = `∫₀^${b.toFixed(2)} f(x)dx · Riemann(${N})=${riemann.toFixed(3)} · Exact=${trueArea.toFixed(3)} · Err=${err.toFixed(4)}`;
-      }
-      break;
-    }
-
-    case "15": {
-      drawGrid(ctx, w, h, 24);
-      const rad = (p1 * Math.PI) / 180;
-      const bLen = p2;
-      const s = sc * 0.95;
-      const ax = s;
-      const bx = Math.cos(rad) * bLen * s;
-      const by = Math.sin(rad) * bLen * s;
-      const proj = Math.cos(rad) * bLen;
-      drawArrow(ctx, cx, cy, cx + ax, cy, COL.cyan, 2.5);
-      drawArrow(ctx, cx, cy, cx + bx, cy - by, COL.pink, 2.5);
-      if (extras?.expMode) {
-        drawArrow(ctx, cx, cy, cx + ax + bx, cy - by, COL.gold, 3);
-        ctx.fillStyle = COL.mint;
-        ctx.font = "bold 10px monospace";
-        ctx.textAlign = "left";
-        ctx.fillText(`RIVER CROSSING: V_net = V_current + V_boat`, 18, 22);
-      } else {
-        ctx.strokeStyle = COL.gold;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(cx + bx, cy - by);
-        ctx.lineTo(cx + proj * s, cy);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-      const dot = (bLen * Math.cos(rad)).toFixed(2);
-      const crossZ = (bLen * Math.sin(rad)).toFixed(2);
-      readout = `${extras?.expMode ? "EXPMT Boat Resultant · " : ""}a·b = ${dot} · |a×b| = ${crossZ} · θ = ${Math.round(p1)}°`;
-      break;
-    }
-
-    case "16": {
-      drawGrid(ctx, w, h, 24);
-      const tilt = (p1 * Math.PI) / 180;
-      const yaw = t * p2 * 0.9;
-      const verts = [
-        [-1, -1, -1],
-        [1, -1, -1],
-        [1, 1, -1],
-        [-1, 1, -1],
-        [-1, -1, 1],
-        [1, -1, 1],
-        [1, 1, 1],
-        [-1, 1, 1],
-      ];
-      const proj = verts.map(([vx, vy, vz]) => {
-        const x1 = vx * Math.cos(yaw) - vz * Math.sin(yaw);
-        const z1 = vx * Math.sin(yaw) + vz * Math.cos(yaw);
-        const y2 = vy * Math.cos(tilt) - z1 * Math.sin(tilt);
-        const z2 = vy * Math.sin(tilt) + z1 * Math.cos(tilt);
-        const f = 3.2 / (3.8 - z2 * 0.45);
-        return [cx + x1 * sc * 0.58 * f, cy - y2 * sc * 0.58 * f];
-      });
-      const edges = [
-        [0, 1],
-        [1, 2],
-        [2, 3],
-        [3, 0],
-        [4, 5],
-        [5, 6],
-        [6, 7],
-        [7, 4],
-        [0, 4],
-        [1, 5],
-        [2, 6],
-        [3, 7],
-      ];
-      ctx.strokeStyle = COL.cyan;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      edges.forEach(([i, j]) => {
-        ctx.moveTo(proj[i][0], proj[i][1]);
-        ctx.lineTo(proj[j][0], proj[j][1]);
-      });
-      ctx.stroke();
-      drawArrow(ctx, proj[0][0], proj[0][1], proj[6][0], proj[6][1], COL.pink, 2);
-      readout = `3D Cube Diagonal & Skew Projection · Tilt ${Math.round(p1)}° · ω=${p2.toFixed(1)}`;
-      break;
-    }
-
-    case "17": {
-      drawGrid(ctx, w, h, 24);
-      const sigma = p1;
-      const zLim = p2;
-      const pdf = (x) => Math.exp(-0.5 * (x / sigma) ** 2) / (sigma * Math.sqrt(2 * Math.PI));
-      const maxPdf = pdf(0);
-      const toPx = (x, y) => [cx + (x / 3.2) * (w * 0.44), h * 0.8 - (y / maxPdf) * (h * 0.56)];
-      ctx.fillStyle = "rgba(255, 77, 120, 0.25)";
-      ctx.beginPath();
-      const [sx0, sb] = toPx(-zLim * sigma, 0);
-      ctx.moveTo(sx0, sb);
-      for (let x = -zLim * sigma; x <= zLim * sigma; x += 0.05) {
-        const [px, py] = toPx(x, pdf(x));
-        ctx.lineTo(px, py);
-      }
-      const [sx1] = toPx(zLim * sigma, 0);
-      ctx.lineTo(sx1, sb);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = COL.gold;
-      ctx.lineWidth = 2.4;
-      ctx.beginPath();
-      for (let x = -3.0; x <= 3.0; x += 0.05) {
-        const [px, py] = toPx(x, pdf(x));
-        if (x === -3.0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
-      readout = `Normal N(0, ${sigma.toFixed(2)}²) · Band ±${zLim.toFixed(1)}σ · Variance σ²=${(sigma * sigma).toFixed(2)}`;
-      break;
-    }
-
-    case "18": {
-      ctx.fillStyle = COL.bg;
-      ctx.fillRect(0, 0, w, h);
-      const P = Math.round(p1) === 1;
-      const Q = Math.round(p2) === 1;
-      const resAnd = P && Q;
-      const resOr = P || Q;
-      const resImp = !P || Q;
-      const drawWire = (x0, y0, x1, y1, on) => {
-        ctx.strokeStyle = on ? COL.mint : COL.axis;
-        ctx.lineWidth = on ? 3 : 1.8;
-        ctx.beginPath();
-        ctx.moveTo(x0, y0);
-        ctx.lineTo(x1, y1);
-        ctx.stroke();
-      };
-      drawWire(68, h * 0.32, cx - 28, h * 0.32, P);
-      drawWire(68, h * 0.68, cx - 28, h * 0.68, Q);
-
-      // Clickable toggle buttons for P and Q
-      [
-        { label: `P = ${P ? 1 : 0}`, on: P, y: h * 0.32 },
-        { label: `Q = ${Q ? 1 : 0}`, on: Q, y: h * 0.68 },
-      ].forEach((btn) => {
-        ctx.fillStyle = btn.on ? "#1f7a3f" : COL.tileOff;
-        ctx.strokeStyle = btn.on ? COL.mint : COL.gold;
-        ctx.lineWidth = 2;
-        ctx.fillRect(14, btn.y - 16, 54, 32);
-        ctx.strokeRect(14, btn.y - 16, 54, 32);
-        ctx.fillStyle = COL.cream;
-        ctx.font = "bold 11px monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(btn.label, 41, btn.y);
-      });
-
-      ctx.fillStyle = COL.grid;
-      ctx.strokeStyle = COL.gold;
-      ctx.lineWidth = 2;
-      ctx.fillRect(cx - 28, h * 0.22, 62, h * 0.56);
-      ctx.strokeRect(cx - 28, h * 0.22, 62, h * 0.56);
-      ctx.fillStyle = COL.gold;
-      ctx.font = "bold 10px monospace";
-      ctx.textAlign = "center";
-      ctx.fillText("GATE", cx + 3, h * 0.5);
-
-      drawWire(cx + 34, h * 0.3, w - 24, h * 0.3, resAnd);
-      drawWire(cx + 34, h * 0.5, w - 24, h * 0.5, resOr);
-      drawWire(cx + 34, h * 0.7, w - 24, h * 0.7, resImp);
-      ctx.fillStyle = COL.cream;
-      ctx.font = "bold 10px monospace";
-      ctx.textAlign = "left";
-      ctx.fillText("Click P or Q", 14, 16);
-      ctx.textAlign = "right";
-      ctx.fillText(`AND:${resAnd ? 1 : 0}`, w - 16, h * 0.25);
-      ctx.fillText(`OR:${resOr ? 1 : 0}`, w - 16, h * 0.45);
-      ctx.fillText(`P→Q:${resImp ? 1 : 0}`, w - 16, h * 0.65);
-      readout = `P=${P ? "T" : "F"}, Q=${Q ? "T" : "F"} · P∧Q=${resAnd ? "T" : "F"} · P∨Q=${resOr ? "T" : "F"} · P→Q=${resImp ? "T" : "F"}`;
-      break;
-    }
-
-    case "19":
-    default: {
-      ctx.fillStyle = COL.bg;
-      ctx.fillRect(0, 0, w, h);
-      const op = Math.max(0, Math.min(3, Math.round(p1)));
-      const ov = p2;
-      const r = Math.min(w, h) * 0.26;
-      const vcy = cy - 12;
-      const ax = cx - r * (1.05 - ov * 0.55);
-      const bx = cx + r * (1.05 - ov * 0.55);
-      ctx.save();
-      if (op === 0) {
-        ctx.globalCompositeOperation = "lighter";
-        ctx.fillStyle = "rgba(135, 232, 244, 0.42)";
-        ctx.beginPath();
-        ctx.arc(ax, vcy, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(255, 77, 120, 0.42)";
-        ctx.beginPath();
-        ctx.arc(bx, vcy, r, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (op === 1) {
-        ctx.beginPath();
-        ctx.arc(ax, vcy, r, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.fillStyle = "rgba(255, 224, 137, 0.65)";
-        ctx.beginPath();
-        ctx.arc(bx, vcy, r, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (op === 2) {
-        ctx.fillStyle = "rgba(135, 232, 244, 0.55)";
-        ctx.beginPath();
-        ctx.arc(ax, vcy, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = COL.bg;
-        ctx.beginPath();
-        ctx.arc(bx, vcy, r, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        ctx.beginPath();
-        ctx.arc(ax, vcy, r, 0, Math.PI * 2);
-        ctx.moveTo(bx + r, vcy);
-        ctx.arc(bx, vcy, r, 0, Math.PI * 2);
-        ctx.clip("evenodd");
-        ctx.fillStyle = "rgba(94, 242, 140, 0.52)";
-        ctx.fillRect(0, 0, w, h);
-      }
-      ctx.restore();
-      ctx.strokeStyle = COL.cyan;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(ax, vcy, r, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.strokeStyle = COL.pink;
-      ctx.beginPath();
-      ctx.arc(bx, vcy, r, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // 4 clickable operation pills along bottom
-      const shortOps = ["A ∪ B", "A ∩ B", "A \\ B", "A △ B"];
-      const btnW = Math.min(82, (w - 40) / 4 - 6);
-      const startX = cx - (4 * btnW + 3 * 6) * 0.5;
-      const by = h - 28;
-      shortOps.forEach((lbl, idx) => {
-        const x = startX + idx * (btnW + 6);
-        const active = op === idx;
-        ctx.fillStyle = active ? COL.pink : COL.grid;
-        ctx.strokeStyle = active ? COL.cream : COL.axis;
-        ctx.lineWidth = 1.5;
-        ctx.fillRect(x, by, btnW, 20);
-        ctx.strokeRect(x, by, btnW, 20);
-        ctx.fillStyle = COL.cream;
-        ctx.font = "bold 10px monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(lbl, x + btnW * 0.5, by + 10);
-      });
-
-      const opNames = ["A ∪ B (FULL JOIN)", "A ∩ B (INNER JOIN)", "A \\ B (LEFT ONLY)", "A △ B (XOR)"];
-      readout = `Set Operation: ${opNames[op]} · Overlap=${ov.toFixed(2)}`;
-      break;
-    }
-
-    case "20": {
-      if (extras?.expMode) {
-        drawGrid(ctx, w, h, 24);
-        const wheelX = w * 0.24;
-        const wheelR = Math.min(w, h) * 0.25;
-        const omega = Math.max(0.5, Math.abs(p1) + 0.6);
-        const ang = t * omega * 1.4;
-        ctx.strokeStyle = COL.gold;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.arc(wheelX, cy, wheelR, 0, Math.PI * 2);
-        ctx.stroke();
-        for (let k = 0; k < 8; k++) {
-          const a = ang + (k * Math.PI * 2) / 8;
-          ctx.strokeStyle = COL.axis;
-          ctx.lineWidth = 1.3;
-          ctx.beginPath();
-          ctx.moveTo(wheelX, cy);
-          ctx.lineTo(wheelX + Math.cos(a) * wheelR, cy - Math.sin(a) * wheelR);
-          ctx.stroke();
-        }
-        const cabX = wheelX + Math.cos(ang) * wheelR;
-        const cabY = cy - Math.sin(ang) * wheelR;
-        ctx.fillStyle = COL.pink;
-        ctx.beginPath();
-        ctx.arc(cabX, cabY, 7, 0, Math.PI * 2);
-        ctx.fill();
-        const waveX0 = wheelX + wheelR + 18;
-        ctx.strokeStyle = COL.cyan;
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        for (let x = waveX0; x < w - 12; x += 3) {
-          const wy = cy - Math.sin(ang - (x - waveX0) * 0.045 * omega) * wheelR;
-          if (x === waveX0) ctx.moveTo(x, wy);
-          else ctx.lineTo(x, wy);
-        }
-        ctx.stroke();
-        ctx.strokeStyle = COL.pink;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(cabX, cabY);
-        ctx.lineTo(waveX0, cabY);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        readout = `EXPMT Ferris Wheel Harmonics: y = R·sin(${omega.toFixed(2)}t) · Height=${(Math.sin(ang) * 15 + 18).toFixed(1)}m`;
-        break;
-      }
-      const unitPx = Math.max(18, Math.min(95, sc * 0.56));
-      const panPxX = Number(extras?.panX) || 0;
-      const panPxY = Number(extras?.panY) || 0;
-      const ox = cx + panPxX;
-      const oy = cy + panPxY;
-      drawGrid(ctx, w, h, unitPx, panPxX, panPxY);
-
-      const exprA = String(extras?.exprA || "p1 * sin(x) + p2 * 0.4").trim() || "p1 * sin(x) + p2 * 0.4";
-      const exprB = String(extras?.exprB || "").trim();
-      const polarMode = Boolean(extras?.polarMode);
-      const showTangent = extras?.showTangent !== false;
-      const showIntegral = Boolean(extras?.showIntegral);
-      const traceX = Number.isFinite(Number(extras?.traceX)) ? Number(extras.traceX) : Math.sin(t * 0.6) * 1.4;
-
-      // Numeric tick labels
-      ctx.fillStyle = COL.axis;
-      ctx.font = "bold 9px monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      for (let gx = -8; gx <= 8; gx++) {
-        if (gx === 0) continue;
-        const px = ox + gx * unitPx;
-        if (px > 12 && px < w - 12) ctx.fillText(String(gx), px, Math.min(h - 14, Math.max(4, oy + 4)));
-      }
-
-      if (polarMode) {
-        // Concentric polar rings
-        ctx.strokeStyle = COL.grid;
-        ctx.lineWidth = 1.2;
-        for (let rr = 1; rr <= 4; rr++) {
-          ctx.beginPath();
-          ctx.arc(ox, oy, rr * unitPx, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-        const plotPolar = (raw, strokeColor, lw) => {
-          ctx.strokeStyle = strokeColor;
-          ctx.lineWidth = lw;
-          ctx.beginPath();
-          let started = false;
-          for (let th = 0; th <= Math.PI * 2 + 0.04; th += 0.025) {
-            const rv = evalMathExpr(raw, th, t, p1, p2);
-            if (!Number.isFinite(rv) || Math.abs(rv) > 12) {
-              started = false;
-              continue;
-            }
-            const px = ox + rv * Math.cos(th) * unitPx;
-            const py = oy - rv * Math.sin(th) * unitPx;
-            if (!started) {
-              ctx.moveTo(px, py);
-              started = true;
-            } else {
-              ctx.lineTo(px, py);
-            }
-          }
-          ctx.stroke();
-        };
-        if (exprB) plotPolar(exprB, COL.pink, 2.0);
-        plotPolar(exprA, COL.cyan, 2.7);
-
-        const th0 = ((traceX % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-        const r0 = evalMathExpr(exprA, th0, t, p1, p2);
-        if (Number.isFinite(r0)) {
-          const px = ox + r0 * Math.cos(th0) * unitPx;
-          const py = oy - r0 * Math.sin(th0) * unitPx;
-          drawArrow(ctx, ox, oy, px, py, COL.gold, 2);
-          ctx.fillStyle = COL.gold;
-          ctx.beginPath();
-          ctx.arc(px, py, 5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        readout = `POLAR r(θ)=${exprA} · θ=${th0.toFixed(2)} rad · r=${Number.isFinite(r0) ? r0.toFixed(2) : "undef"}`;
-      } else {
-        const toPx = (x, y) => [ox + x * unitPx, oy - y * unitPx];
-        const minX = -ox / unitPx - 0.2;
-        const maxX = (w - ox) / unitPx + 0.2;
-
-        // Definite integral shading over [0, 2]
-        let integralVal = 0;
-        const intA = 0;
-        const intB = 2;
-        const steps = 40;
-        const dxInt = (intB - intA) / steps;
-        for (let i = 0; i < steps; i++) {
-          const xm = intA + (i + 0.5) * dxInt;
-          const ym = evalMathExpr(exprA, xm, t, p1, p2);
-          if (Number.isFinite(ym)) integralVal += ym * dxInt;
-        }
-        if (showIntegral) {
-          ctx.fillStyle = "rgba(94, 242, 140, 0.26)";
-          ctx.beginPath();
-          const [sx0, sy0] = toPx(intA, 0);
-          ctx.moveTo(sx0, sy0);
-          for (let x = intA; x <= intB + 0.001; x += 0.04) {
-            const yv = evalMathExpr(exprA, x, t, p1, p2);
-            const [px, py] = toPx(x, Number.isFinite(yv) ? Math.max(-10, Math.min(10, yv)) : 0);
-            ctx.lineTo(px, py);
-          }
-          const [sx1] = toPx(intB, 0);
-          ctx.lineTo(sx1, sy0);
-          ctx.closePath();
-          ctx.fill();
-        }
-
-        const plotCartesian = (raw, strokeColor, lw) => {
-          ctx.strokeStyle = strokeColor;
-          ctx.lineWidth = lw;
-          ctx.beginPath();
-          let started = false;
-          let prevYv = 0;
-          const dx = Math.max(0.015, (maxX - minX) / 220);
-          for (let x = minX; x <= maxX; x += dx) {
-            const yv = evalMathExpr(raw, x, t, p1, p2);
-            if (!Number.isFinite(yv) || Math.abs(yv) > 14 || (started && Math.abs(yv - prevYv) > 6)) {
-              started = false;
-              prevYv = yv;
-              continue;
-            }
-            const [px, py] = toPx(x, yv);
-            if (!started) {
-              ctx.moveTo(px, py);
-              started = true;
-            } else {
-              ctx.lineTo(px, py);
-            }
-            prevYv = yv;
-          }
-          ctx.stroke();
-        };
-
-        if (exprB) plotCartesian(exprB, COL.pink, 2.0);
-        plotCartesian(exprA, COL.cyan, 2.7);
-
-        // Crosshair trace, tangent & normal lines at traceX
-        const y0 = evalMathExpr(exprA, traceX, t, p1, p2);
-        const hEps = 0.002;
-        const yPlus = evalMathExpr(exprA, traceX + hEps, t, p1, p2);
-        const yMinus = evalMathExpr(exprA, traceX - hEps, t, p1, p2);
-        const slope = Number.isFinite(yPlus) && Number.isFinite(yMinus) ? (yPlus - yMinus) / (2 * hEps) : Number.NaN;
-
-        if (Number.isFinite(y0)) {
-          const [tx, ty] = toPx(traceX, y0);
-          ctx.strokeStyle = COL.axis;
-          ctx.setLineDash([4, 4]);
-          ctx.lineWidth = 1.2;
-          ctx.beginPath();
-          ctx.moveTo(tx, 0);
-          ctx.lineTo(tx, h);
-          ctx.moveTo(0, ty);
-          ctx.lineTo(w, ty);
-          ctx.stroke();
-          ctx.setLineDash([]);
-
-          if (showTangent && Number.isFinite(slope)) {
-            const [t1x, t1y] = toPx(traceX - 1.5, y0 - slope * 1.5);
-            const [t2x, t2y] = toPx(traceX + 1.5, y0 + slope * 1.5);
-            ctx.strokeStyle = COL.gold;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(t1x, t1y);
-            ctx.lineTo(t2x, t2y);
-            ctx.stroke();
-
-            if (Math.abs(slope) > 0.04) {
-              const normSlope = -1 / slope;
-              const [n1x, n1y] = toPx(traceX - 0.85, y0 - normSlope * 0.85);
-              const [n2x, n2y] = toPx(traceX + 0.85, y0 + normSlope * 0.85);
-              ctx.strokeStyle = COL.violet;
-              ctx.setLineDash([5, 4]);
-              ctx.lineWidth = 1.6;
-              ctx.beginPath();
-              ctx.moveTo(n1x, n1y);
-              ctx.lineTo(n2x, n2y);
-              ctx.stroke();
-              ctx.setLineDash([]);
-            }
-          }
-
-          ctx.fillStyle = COL.gold;
-          ctx.beginPath();
-          ctx.arc(tx, ty, 5.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        const fStr = Number.isFinite(y0) ? y0.toFixed(2) : "undef";
-        const dfStr = Number.isFinite(slope) ? slope.toFixed(2) : "--";
-        const intStr = showIntegral ? ` · ∫₀²=${integralVal.toFixed(2)}` : "";
-        readout = `f(x)=${exprA} · (${traceX.toFixed(2)}, ${fStr}) · f'=${dfStr}${intStr}`;
-      }
-      break;
-    }
-  }
-
-  drawStatusOverlay(ctx, w, extras);
-  return readout;
+function formatTime12(hr) {
+  const whole = Math.floor(hr);
+  const mins = Math.round((hr - whole) * 60);
+  const suf = whole >= 12 ? "PM" : "AM";
+  const h12 = whole % 12 === 0 ? 12 : whole % 12;
+  return `${String(h12).padStart(2, "0")}:${String(mins).padStart(2, "0")} ${suf}`;
 }
 
 export function evaluateChapterMission(chapterId, p1, p2) {
   switch (chapterId) {
     case "B1": {
-      const a = Math.round(p1);
-      const b = Math.round(p2);
-      const sum = a + b;
-      return {
-        solved: sum === 20 && b >= 5,
-        currentLabel: `${a} + (${b}) = ${sum} (target 20 with Jump B ≥ 5)`,
-      };
+      const deg = ((Math.round(p1) % 360) + 360) % 360;
+      const hr = Math.round(p2);
+      const solved = deg === 90 && hr === 9;
+      return { solved, currentLabel: `Bearing=${deg}° (${compassLabelForDeg(deg)}), Sun=${hr}:00` };
     }
     case "B2": {
-      const b = Math.max(2, Math.round(p2));
-      const a = Math.max(1, Math.round(p1));
-      const pct = (a / b) * 100;
-      return {
-        solved: Math.abs(pct - 75) <= 0.5,
-        currentLabel: `${a}/${b} = ${pct.toFixed(1)}% (target 75%)`,
-      };
+      const dist = Number((p1 * p2).toFixed(1));
+      const solved = Math.abs(dist - 100) < 0.1;
+      return { solved, currentLabel: `1cm=${p1}km × ${p2}cm = ${dist} km` };
     }
     case "B3": {
-      const mrp = Math.round(p1 * 100);
-      const net = Math.round(mrp * (1 - p2 / 100));
-      return {
-        solved: net === 600,
-        currentLabel: `Net Bill = ₹${net} (target ₹600)`,
-      };
+      const solved = p1 >= 23 && p1 <= 24;
+      return { solved, currentLabel: `Latitude=${p1}°N, Zone=${p2}` };
     }
     case "B4": {
-      const a = Math.round(p1);
-      const lhs = a * p2 + 2;
-      return {
-        solved: Math.abs(lhs - 10) < 0.05,
-        currentLabel: `${a}(${p2.toFixed(1)}) + 2 = ${lhs.toFixed(1)} (target 10.0)`,
-      };
+      const eraNames = ["", "Barter", "Silver Coin", "RBI Rupee", "Digital UPI"];
+      const solved = Math.round(p2) === 4 && p1 >= 10;
+      return { solved, currentLabel: `Units=${p1}, Era=${eraNames[Math.round(p2)] || p2}` };
     }
     case "B5": {
-      const L = Math.round(p1);
-      const W = Math.round(p2);
-      const area = L * W;
-      const perim = 2 * (L + W);
-      return {
-        solved: area === 24 && perim === 20,
-        currentLabel: `Area = ${area} (target 24) · Perim = ${perim} (target 20)`,
-      };
+      const solved = p1 >= 3 && p2 >= 200;
+      return { solved, currentLabel: `Era Stage=${p1}, Pop=${p2}` };
     }
-    case "00":
-      return {
-        solved: Math.abs(p2 - 1.5) <= 0.06 && p1 >= 0.6,
-        currentLabel: `det = ${p2.toFixed(2)} (target 1.50) · Shear X = ${p1.toFixed(2)} (≥ 0.60)`,
-      };
+    case "00": {
+      const pillars = ["", "History", "Geography", "Civics", "Economics"];
+      const solved = Math.round(p1) === 4 && p2 >= 8;
+      return { solved, currentLabel: `Pillar=${pillars[Math.round(p1)] || p1}, Span=${p2}` };
+    }
     case "01": {
-      const n = Math.round(p1);
-      const deg = ((p2 % 360) + 360) % 360;
-      const diff45 = Math.min(Math.abs(deg - 45), 360 - Math.abs(deg - 45));
-      return {
-        solved: n === 8 && diff45 <= 5,
-        currentLabel: `n = ${n} (target 8) · Phase θ₀ = ${Math.round(deg)}° (target 45°)`,
-      };
+      const solved = p1 >= 6 && p2 >= 7;
+      return { solved, currentLabel: `Blocks=${p1}, Drain Slope=${p2}/10` };
     }
     case "02": {
-      const det = Math.abs(Math.sin(((p2 - p1) * Math.PI) / 180));
-      return {
-        solved: det < 0.08,
-        currentLabel: `|det| = ${det.toFixed(3)} (target < 0.080)`,
-      };
+      const solved = p1 >= 18 && Math.round(p2) === 5;
+      return { solved, currentLabel: `Reach=${p1 * 100} km, Provinces=${p2}/5` };
     }
     case "03": {
-      const n = Math.max(3, Math.min(8, Math.round(p1)));
-      const r = Math.max(1, Math.min(n, Math.round(p2)));
-      const comb = nCr(n, r);
-      return {
-        solved: comb === 20,
-        currentLabel: `${n}C${r} = ${comb} (target 20)`,
-      };
+      const solved = p1 >= 12 && Math.round(p2) === 7;
+      return { solved, currentLabel: `Span=${p1}m, Zat=${p2 * 1000}` };
     }
-    case "04":
-      return {
-        solved: Math.round(p1) >= 8 && Math.round(p2) === 2,
-        currentLabel: `Rows N = ${Math.round(p1)} (≥ 8) · Mod = ${Math.round(p2)} (target 2)`,
-      };
+    case "04": {
+      const solved = Math.round(p1) === 1947 && p2 >= 100;
+      return { solved, currentLabel: `Year=${Math.round(p1)}, Reach=${p2}%` };
+    }
     case "05": {
-      const n = Math.round(p2);
-      const sInf = Math.abs(p1) < 1 ? (1 / (1 - p1)).toFixed(2) : "∞";
-      return {
-        solved: Math.abs(p1 - 0.6) < 0.03 && n >= 10,
-        currentLabel: `r = ${p1.toFixed(2)} (S∞ = ${sInf}, target 2.50) · N = ${n} (≥ 10)`,
-      };
+      const solved = p1 >= 8 && p2 >= 8;
+      return { solved, currentLabel: `Steam=${p1}, Print=${p2}` };
     }
     case "06": {
-      const mu = p1 * Math.round(p2);
-      return {
-        solved: Math.abs(mu - 6.0) < 0.15,
-        currentLabel: `Mean μ = n×p = ${mu.toFixed(2)} (target 6.00)`,
-      };
+      const solved = p1 >= 0.8 && p2 >= 8;
+      return { solved, currentLabel: `Co-op=${Math.round(p1 * 100)}%, Blocs=${p2}` };
     }
-    case "07":
-      return {
-        solved: Math.abs(p1 - 3.0) < 0.06 && p2 >= 0.98,
-        currentLabel: `ω = ${p1.toFixed(2)} (target 3.00) · Amp = ${p2.toFixed(2)} (≥ 0.98)`,
-      };
+    case "07": {
+      const solved = Math.abs(p1 - 82.5) < 0.2 && p2 >= 20 && p2 <= 30;
+      return { solved, currentLabel: `Lon=${p1}°, Lat=${p2}°` };
+    }
     case "08": {
-      const l1 = 1.05;
-      const l2 = 0.95;
-      const maxR = l1 + l2 - 0.05;
-      let tx = p1;
-      let ty = p2;
-      const dist = Math.hypot(tx, ty);
-      if (dist > maxR) {
-        tx = (tx / dist) * maxR;
-        ty = (ty / dist) * maxR;
-      }
-      const d = Math.max(0.2, Math.hypot(tx, ty));
-      const cosQ2 = Math.max(-1, Math.min(1, (d * d - l1 * l1 - l2 * l2) / (2 * l1 * l2)));
-      const deg2 = (Math.acos(cosQ2) * 180) / Math.PI;
-      return {
-        solved: deg2 >= 85 && deg2 <= 95,
-        currentLabel: `Elbow θ₂ = ${deg2.toFixed(1)}° (target 85°–95°)`,
-      };
+      const solved = p1 >= 5 && p2 >= 7.0;
+      return { solved, currentLabel: `Plate=${p1} cm/yr, M=${p2.toFixed(1)}` };
     }
     case "09": {
-      const sideB = Math.hypot(p1 - 0.8, p2);
-      const sideC = Math.hypot(p1 + 0.8, p2);
-      return {
-        solved: Math.abs(sideB - 1.6) <= 0.05 && Math.abs(sideC - 1.6) <= 0.05,
-        currentLabel: `Sides (1.60, ${sideB.toFixed(2)}, ${sideC.toFixed(2)}) (target 1.60 each)`,
-      };
+      const solved = p1 >= 16 && p2 >= 85;
+      return { solved, currentLabel: `ΔT=${p1}°C, Humidity=${p2}%` };
     }
     case "10": {
-      const samples = [
-        [-1.1, 0.9, 1],
-        [-0.7, 1.2, 1],
-        [-1.4, 0.2, 1],
-        [1.1, -0.8, -1],
-        [0.8, -1.1, -1],
-        [1.3, -0.1, -1],
-      ];
-      let correct = 0;
-      samples.forEach(([sx, sy, cls]) => {
-        if ((sy >= p1 * sx + p2 ? 1 : -1) === cls) correct++;
-      });
-      return {
-        solved: correct === 6,
-        currentLabel: `Classifier Accuracy: ${correct}/6 (target 6/6)`,
-      };
+      const solved = p1 >= 30 && p2 >= 1500;
+      return { solved, currentLabel: `Snowmelt=${p1}%, Rain=${p2}mm` };
     }
     case "11": {
-      const sumR = p1 + 0.78;
-      const diff = Math.abs(p2 - sumR);
-      return {
-        solved: diff < 0.08,
-        currentLabel: `d = ${p2.toFixed(2)} vs R₁+R₂ = ${sumR.toFixed(2)} (gap ${diff.toFixed(2)})`,
-      };
+      const soils = ["", "Alluvial", "Black Regur", "Red Iron", "Laterite"];
+      const solved = Math.round(p1) === 2 && p2 >= 60 && p2 <= 75;
+      return { solved, currentLabel: `${soils[Math.round(p1)] || "Soil"}, Moisture=${p2}%` };
     }
-    case "12":
-      return {
-        solved: Math.abs(p1 - 1.0) < 0.03,
-        currentLabel: `Eccentricity e = ${p1.toFixed(2)} (target 1.00)`,
-      };
-    case "13": {
-      const slope = 0.84 * p1 * p1 - 0.85;
-      return {
-        solved: Math.abs(slope) < 0.05 && p2 <= 0.1,
-        currentLabel: `|f'(x)| = ${Math.abs(slope).toFixed(3)} (<0.05) · Δx = ${p2.toFixed(2)} (≤0.10)`,
-      };
-    }
-    case "14": {
-      const N = Math.max(4, Math.round(p1));
-      const b = p2;
-      const step = b / N;
-      let riemann = 0;
-      for (let i = 0; i < N; i++) {
-        const xm = (i + 0.5) * step;
-        riemann += (Math.sin(xm) * 0.9 + 0.55) * step;
-      }
-      const exact = 0.9 * (1 - Math.cos(b)) + 0.55 * b;
-      const err = Math.abs(riemann - exact);
-      return {
-        solved: err <= 0.002 && b >= 2.5,
-        currentLabel: `Err = ${err.toFixed(4)} (≤ 0.002) · Upper Bound b = ${b.toFixed(2)} (≥ 2.50)`,
-      };
-    }
-    case "15": {
-      const cross = p2 * Math.sin((p1 * Math.PI) / 180);
-      return {
-        solved: cross >= 1.4,
-        currentLabel: `|a×b| = ${cross.toFixed(2)} (target ≥ 1.40)`,
-      };
-    }
-    case "16":
-      return {
-        solved: Math.abs(p1 - 35) <= 5 && p2 >= 0.8,
-        currentLabel: `Tilt = ${Math.round(p1)}° (30°–40°) · Spin = ${p2.toFixed(1)} (≥ 0.8)`,
-      };
-    case "17":
-      return {
-        solved: p1 <= 0.7 && Math.abs(p2 - 2.0) <= 0.11,
-        currentLabel: `σ = ${p1.toFixed(2)} (≤ 0.70) · Z = ${p2.toFixed(1)} (target 2.0)`,
-      };
-    case "18":
-      return {
-        solved: Math.round(p1) === 0 && Math.round(p2) === 1,
-        currentLabel: `P = ${Math.round(p1)}, Q = ${Math.round(p2)} (target P=0, Q=1)`,
-      };
-    case "19":
-      return {
-        solved: Math.round(p1) === 3 && p2 >= 0.85,
-        currentLabel: `Set Op = ${Math.round(p1)} (target 3: A△B) · Overlap = ${p2.toFixed(2)} (≥ 0.85)`,
-      };
-    case "20":
-    default:
-      return {
-        solved: p1 >= 1.0 && Math.abs(p2) <= 0.16,
-        currentLabel: `Scale k = ${p1.toFixed(1)} (≥ 1.0) · Shift b = ${p2.toFixed(1)} (within ±0.15)`,
-      };
-  }
-}
-
-function quantize(val, min, max, step) {
-  const clamped = Math.max(min, Math.min(max, val));
-  const steps = Math.round((clamped - min) / step);
-  const q = Math.max(min, Math.min(max, min + steps * step));
-  return Number(q.toFixed(4));
-}
-
-export function mapCanvasPointerToParams(chapterId, normX, normY, curP1, curP2, ch, isClick = false) {
-  const nx = Math.max(0, Math.min(1, normX));
-  const ny = Math.max(0, Math.min(1, normY));
-  const lerp = (min, max, f) => min + (max - min) * f;
-
-  switch (chapterId) {
-    case "B1":
-      return {
-        p1: quantize(lerp(ch.p1Min, ch.p1Max, nx), ch.p1Min, ch.p1Max, ch.p1Step),
-        p2: quantize(lerp(ch.p2Min, ch.p2Max, 1 - ny), ch.p2Min, ch.p2Max, ch.p2Step),
-      };
-    case "B2": {
-      const b = Math.max(2, Math.round(curP2));
-      const a = Math.max(1, Math.min(ch.p1Max, Math.round(nx * b)));
-      return {
-        p1: isClick ? a : quantize(lerp(ch.p1Min, ch.p1Max, nx), ch.p1Min, ch.p1Max, ch.p1Step),
-        p2: quantize(lerp(ch.p2Min, ch.p2Max, 1 - ny), ch.p2Min, ch.p2Max, ch.p2Step),
-      };
-    }
-    case "B3":
-    case "B4":
-    case "B5":
-      return {
-        p1: quantize(lerp(ch.p1Min, ch.p1Max, nx), ch.p1Min, ch.p1Max, ch.p1Step),
-        p2: quantize(lerp(ch.p2Min, ch.p2Max, 1 - ny), ch.p2Min, ch.p2Max, ch.p2Step),
-      };
-    case "01": {
-      const ang = Math.atan2(0.5 - ny, nx - 0.5);
-      const deg = ((ang * 180) / Math.PI + 360) % 360;
-      const radDist = Math.min(1, Math.hypot(nx - 0.5, ny - 0.5) * 2.2);
-      return {
-        p1: isClick ? quantize(lerp(ch.p1Min, ch.p1Max, radDist), ch.p1Min, ch.p1Max, ch.p1Step) : curP1,
-        p2: quantize(deg, ch.p2Min, ch.p2Max, ch.p2Step),
-      };
-    }
-    case "08": {
-      const tx = (nx - 0.36) * 2.8;
-      const ty = (0.64 - ny) * 2.6;
-      return {
-        p1: quantize(tx, ch.p1Min, ch.p1Max, ch.p1Step),
-        p2: quantize(ty, ch.p2Min, ch.p2Max, ch.p2Step),
-      };
-    }
-    case "09": {
-      const ax = (nx - 0.5) * 2.2;
-      const ay = (0.68 - ny) * 2.1;
-      return {
-        p1: quantize(ax, ch.p1Min, ch.p1Max, ch.p1Step),
-        p2: quantize(ay, ch.p2Min, ch.p2Max, ch.p2Step),
-      };
+    case "12": {
+      const clean = p1 + p2;
+      const solved = clean >= 75 && clean <= 100;
+      return { solved, currentLabel: `Clean=${clean}% (${p1}% Solar/Wind + ${p2}% Hydro)` };
     }
     case "13": {
-      const x0 = (nx - 0.5) * 4.4;
-      return {
-        p1: quantize(x0, ch.p1Min, ch.p1Max, ch.p1Step),
-        p2: quantize(lerp(ch.p2Min, ch.p2Max, 1 - ny), ch.p2Min, ch.p2Max, ch.p2Step),
-      };
+      const solved = Math.round(p1) === 6 && p2 >= 100;
+      return { solved, currentLabel: `Right #${Math.round(p1)}, Awareness=${p2}%` };
     }
     case "14": {
-      const b = ((nx - 0.14) / 0.72) * 3.2;
-      return {
-        p1: quantize(lerp(ch.p1Min, ch.p1Max, 1 - ny), ch.p1Min, ch.p1Max, ch.p1Step),
-        p2: quantize(b, ch.p2Min, ch.p2Max, ch.p2Step),
-      };
+      const total = Math.min(543, Math.round(p1 + p2));
+      const solved = total >= 362;
+      return { solved, currentLabel: `${total}/543 Seats (Special 2/3 = 362)` };
     }
     case "15": {
-      const dx = nx - 0.5;
-      const dy = 0.5 - ny;
-      const deg = (Math.atan2(Math.max(0.01, dy), dx) * 180) / Math.PI;
-      const len = Math.hypot(dx, dy) * 3.1;
-      return {
-        p1: quantize(deg, ch.p1Min, ch.p1Max, ch.p1Step),
-        p2: quantize(len, ch.p2Min, ch.p2Max, ch.p2Step),
-      };
+      const sum = p1 + p2;
+      const solved = p1 >= 45 && sum <= 90;
+      return { solved, currentLabel: `Local=${p1}%, State=${p2}%, Union=${Math.max(0, 100 - sum)}%` };
+    }
+    case "16": {
+      const tiers = ["", "District", "High Court", "Supreme Court"];
+      const solved = Math.round(p2) === 3 && p1 >= 9;
+      return { solved, currentLabel: `${tiers[Math.round(p2)] || "Court"}, Autonomy=${p1}/10` };
+    }
+    case "17": {
+      const solved = Math.round(p1) === 15 && Math.round(p2) === 5;
+      return { solved, currentLabel: `UNSC Votes=${p1}/15, P5 Concur=${p2}/5` };
     }
     case "18": {
-      if (!isClick) return { p1: curP1, p2: curP2 };
-      if (ny < 0.5) {
-        return { p1: Math.round(curP1) === 1 ? 0 : 1, p2: curP2 };
-      }
-      return { p1: curP1, p2: Math.round(curP2) === 1 ? 0 : 1 };
+      const pStar = Number(((p1 - (20 - p2)) / 2).toFixed(1));
+      const qStar = Number((p1 - pStar).toFixed(1));
+      const solved = qStar >= 50 && pStar <= 45;
+      return { solved, currentLabel: `P*=₹${pStar}, Q*=${qStar} units` };
     }
     case "19": {
-      if (isClick && ny > 0.76) {
-        const opIdx = Math.max(0, Math.min(3, Math.floor(((nx - 0.2) / 0.6) * 4)));
-        return { p1: opIdx, p2: curP2 };
-      }
-      const pull = 1 - Math.min(1, Math.abs(nx - 0.5) * 2.1);
-      return {
-        p1: curP1,
-        p2: quantize(lerp(ch.p2Min, ch.p2Max, pull), ch.p2Min, ch.p2Max, ch.p2Step),
-      };
+      const pri = Math.max(0, 100 - p1 - p2);
+      const solved = p1 >= 32 && p2 >= 52 && pri >= 10;
+      return { solved, currentLabel: `Pri=${pri}%, Ind=${p1}%, Svc=${p2}%` };
     }
     case "20":
-      return {
-        p1: quantize(lerp(ch.p1Min, ch.p1Max, nx), ch.p1Min, ch.p1Max, ch.p1Step),
-        p2: quantize(lerp(ch.p2Min, ch.p2Max, 1 - ny), ch.p2Min, ch.p2Max, ch.p2Step),
-      };
-    default:
-      return {
-        p1: quantize(lerp(ch.p1Min, ch.p1Max, nx), ch.p1Min, ch.p1Max, ch.p1Step),
-        p2: quantize(lerp(ch.p2Min, ch.p2Max, 1 - ny), ch.p2Min, ch.p2Max, ch.p2Step),
-      };
+    default: {
+      const solved = Math.abs(p1 - 75) < 1 && Math.abs(p2 - 25) < 1;
+      return { solved, currentLabel: `Meridian=${p1}°, Tropic Tilt=${p2}°` };
+    }
   }
 }
 
-export function getStepByStepBreakdown(chapterId, p1, p2, extras = {}) {
+export function mapCanvasPointerToParams(chapterId, nx, ny, p1, p2, ch) {
+  const cx = Math.max(0, Math.min(1, nx));
+  const cy = Math.max(0, Math.min(1, ny));
+  const snap = (val, min, max, step) => {
+    const clamped = Math.max(min, Math.min(max, val));
+    const k = Math.round((clamped - min) / step);
+    return Number((min + k * step).toFixed(4));
+  };
+
+  if (chapterId === "B1") {
+    const angle = (Math.atan2(cx - 0.5, -(cy - 0.5)) * 180) / Math.PI;
+    const deg = ((angle % 360) + 360) % 360;
+    return {
+      p1: snap(deg, ch.p1Min, ch.p1Max, ch.p1Step),
+      p2: snap(ch.p2Min + cx * (ch.p2Max - ch.p2Min), ch.p2Min, ch.p2Max, ch.p2Step),
+    };
+  }
+  return {
+    p1: snap(ch.p1Min + cx * (ch.p1Max - ch.p1Min), ch.p1Min, ch.p1Max, ch.p1Step),
+    p2: snap(ch.p2Min + (1 - cy) * (ch.p2Max - ch.p2Min), ch.p2Min, ch.p2Max, ch.p2Step),
+  };
+}
+
+export function getStepByStepBreakdown(chapterId, p1, p2, extras) {
   switch (chapterId) {
     case "B1": {
-      const a = Math.round(p1);
-      const b = Math.round(p2);
-      const s = a + b;
-      return `Step 1: Start at ${a} on number line · Step 2: Jump ${b >= 0 ? "+" : ""}${b} -> ${s} (${Math.floor(Math.abs(s) / 10)} tens, ${Math.abs(s) % 10} ones)`;
+      const dir = compassLabelForDeg(p1);
+      const shadowDir = p2 < 12 ? "West" : p2 > 12 ? "East" : "Directly Under";
+      return `Bearing: ${Math.round(p1)}° (${dir}) · Sun Time: ${formatTime12(p2)} · Shadow points ${shadowDir}`;
     }
-    case "B2": {
-      const a = Math.round(p1);
-      const b = Math.max(2, Math.round(p2));
-      return `Step 1: Fraction ${a}/${b} = ${(a / b).toFixed(3)} · Step 2: Percent = (${a} ÷ ${b}) × 100 = ${((a / b) * 100).toFixed(1)}%`;
-    }
+    case "B2":
+      return `Map Distance = ${p2} cm · Scale: 1 cm = ${p1} km -> Ground Distance = ${(p1 * p2).toFixed(1)} km`;
     case "B3": {
-      const mrp = Math.round(p1 * 100);
-      const saved = Math.round(mrp * (p2 / 100));
-      return `Step 1: MRP = ₹${mrp}, Discount = ${Math.round(p2)}% (₹${saved}) · Step 2: Net Payable = ₹${mrp - saved}`;
+      const belt = p1 >= 30 ? "Himalayan & Trans-Himalayan" : p1 >= 24 ? "Great Northern Plains" : p1 >= 15 ? "Peninsular Deccan Plateau" : "Coastal Plains & Islands";
+      return `Latitude ${p1}°N -> ${belt} · Elevation Tier ${p2}/5 · Tropic of Cancer = 23.5°N`;
     }
     case "B4": {
-      const a = Math.round(p1);
-      const sol = (8 / Math.max(1, a)).toFixed(2);
-      return `Step 1: ${a}x + 2 = 10 -> subtract 2 -> ${a}x = 8 · Step 2: Exact x = 8/${a} = ${sol} (your x=${p2.toFixed(1)})`;
+      const eras = ["", "Barter Goods", "Punch/Silver Rupiya", "RBI Paper Notes", "Instant Digital UPI"];
+      return `Era: ${eras[Math.round(p2)] || p2} · Trade Volume: ${p1} bags (₹${p1 * 120}) · Zero double-coincidence friction in Era ≥ 2`;
     }
     case "B5": {
-      const L = Math.round(p1);
-      const W = Math.round(p2);
-      return `Step 1: Area = L × W = ${L} × ${W} = ${L * W} · Step 2: Perimeter = 2(${L} + ${W}) = ${2 * (L + W)} m`;
+      const stages = ["", "Paleolithic", "Mesolithic", "Neolithic Farming", "Chalcolithic Wheel", "Early Civic Towns"];
+      return `Stage ${p1}: ${stages[Math.round(p1)] || ""} · Community = ${p2} residents · Surplus grain unlocks craft guilds`;
     }
-    case "00":
-      return `Step 1: Apply M=[[1,${p1.toFixed(2)}],[0,${p2.toFixed(2)}]] · Step 2: Area det(M) = 1×${p2.toFixed(2)} = ${p2.toFixed(2)}`;
-    case "01": {
-      const n = Math.max(3, Math.round(p1));
-      return `Step 1: z^${n}=1 ⇒ θₖ = (${Math.round(p2)}° + 360°k)/${n} · Step 2: Modulus |z|=1, sum of roots = 0`;
+    case "00": {
+      const names = ["", "History (Time & Sources)", "Geography (Maps & Climate)", "Civics (Rights & Law)", "Economics (Markets & GDP)"];
+      return `Active Lens: ${names[Math.round(p1)] || ""} · Chronicle Window: ${p2 * 250} Years · All 4 SST lenses connected`;
     }
-    case "02": {
-      const det = Math.sin(((p2 - p1) * Math.PI) / 180);
-      return `Step 1: Angle gap Δθ = ${Math.round(p2 - p1)}° · Step 2: det = sin(Δθ) = ${det.toFixed(3)} ${Math.abs(det) < 0.08 ? "⇒ Non-invertible" : "⇒ Invertible"}`;
-    }
-    case "03": {
-      const n = Math.max(3, Math.min(8, Math.round(p1)));
-      const r = Math.max(1, Math.min(n, Math.round(p2)));
-      return `Step 1: ${n}C${r} = ${n}!/[${r}!(${n}-${r})!] = ${nCr(n, r)} · Step 2: ${n}P${r} = ${r}!×${nCr(n, r)} = ${Math.round(fact(n) / fact(n - r))}`;
+    case "01":
+      return `Mohenjo-daro Citadel: ${p1}×${p1} Street Blocks · Drain Fall: ${p2}/10 · Standard Brick Ratio = 1 : 2 : 4`;
+    case "02":
+      return `Mauryan Capital: Pataliputra -> Radius ${p1 * 100} km across ${p2}/5 Provinces · Script: Brahmi / Prakrit`;
+    case "03":
+      return `Keystone True Arch Span = ${p1} m · Mansabdar Rank: ${p2 * 1000} Zat · Policy: Sulh-i-Kul & Zabt Survey`;
+    case "04": {
+      const y = Math.round(p1);
+      const mil = y < 1885 ? "1857 First War of Independence" : y < 1920 ? "1905 Swadeshi & Boycott" : y < 1935 ? "1930 Dandi Salt Satyagraha" : y < 1945 ? "1942 Quit India" : "1947 Independence & Constitution";
+      return `Year ${y} AD (${mil}) · Mass Civic Mobilization: ${p2}%`;
     }
     case "05":
-      return `Step 1: Sₙ = (1 - rⁿ)/(1 - r) for r=${p1.toFixed(2)} · Step 2: ${Math.abs(p1) < 1 ? `S∞ = 1/(1 - ${p1.toFixed(2)}) = ${(1 / (1 - p1)).toFixed(3)}` : "|r| ≥ 1 diverges"}`;
-    case "06": {
-      const n = Math.max(4, Math.round(p2));
-      return `Step 1: μ = n·p = ${n}×${p1.toFixed(2)} = ${(n * p1).toFixed(2)} · Step 2: σ = √(np(1-p)) = ${Math.sqrt(n * p1 * (1 - p1)).toFixed(2)}`;
+      return `Industrial Steam RPM: ${p1}x · Gutenberg Press Scale: ${p2}x -> Literacy Index = ${Math.min(100, Math.round((p1 + p2) * 5))}%`;
+    case "06":
+      return `Diplomacy: ${p2} Power Blocs · Multilateral Co-op = ${Math.round(p1 * 100)}% -> Peace Stability = ${Math.round(p1 * 80 + Math.min(20, p2 * 2))}%`;
+    case "07": {
+      const mins = Math.round(p1 * 4);
+      const sign = mins >= 0 ? "+" : "-";
+      const ah = Math.floor(Math.abs(mins) / 60);
+      const am = Math.abs(mins) % 60;
+      return `Coords: ${p2}°N, ${p1}°E · Earth = 4 min/° -> GMT ${sign}${ah}h ${String(am).padStart(2, "0")}m (IST 82.5°E = +5h 30m)`;
     }
-    case "07":
-      return `Step 1: y(t) = ${p2.toFixed(2)}·sin(${p1.toFixed(2)}t) · Step 2: Period T = 2π/${p1.toFixed(2)} = ${((Math.PI * 2) / p1).toFixed(2)}s`;
+    case "08": {
+      const energy = Math.pow(10, p2 - 3).toFixed(1);
+      return `Plate Drift: ${p1} cm/yr · Quake M${p2.toFixed(1)} -> Relative Seismic Energy ≈ ${energy}× Base · P-waves arrive first`;
+    }
+    case "09": {
+      const rain = Math.round(p1 * 42 + p2 * 14);
+      return `Land-Sea ΔT = ${p1}°C · RH = ${p2}% · Estimated SW Monsoon Rainfall = ${rain} mm (Coriolis -> SW -> NE)`;
+    }
     case "10":
-      return `Step 1: Line y = ${p1.toFixed(1)}x + ${p2.toFixed(1)} · Step 2: Dist to origin = |${p2.toFixed(1)}|/√(${p1.toFixed(1)}²+1) = ${(Math.abs(p2) / Math.hypot(p1, 1)).toFixed(2)}`;
-    case "12":
-      return `Step 1: r(θ) = e·p/(1 + e·cosθ) · Step 2: e=${p1.toFixed(2)} classifies ${p1 < 0.05 ? "Circle" : p1 < 0.98 ? "Ellipse" : p1 <= 1.02 ? "Parabola" : "Hyperbola"}`;
+      return `River Regime: ${p1}% Glacier Snowmelt + ${p2} mm Rain -> Dry-Season Baseflow ${p1 >= 25 ? "Perennial" : "Seasonal"}`;
+    case "11": {
+      const crops = ["", "Alluvial: Rice & Wheat", "Black Regur: Cotton & Soy", "Red Iron: Millets & Groundnut", "Laterite: Tea, Coffee & Cashew"];
+      return `${crops[Math.round(p1)] || ""} · Soil Moisture = ${p2}% · Seasons: Kharif (Jun) / Rabi (Oct) / Zaid`;
+    }
+    case "12": {
+      const clean = p1 + p2;
+      const fossil = Math.max(0, 100 - clean);
+      return `Grid Mix: ${p1}% Solar+Wind + ${p2}% Hydro/Nuc = ${clean}% Clean · Thermal Fossil = ${fossil}%`;
+    }
     case "13": {
-      const val = 0.28 * p1 ** 3 - 0.85 * p1;
-      const sl = 0.84 * p1 * p1 - 0.85;
-      return `Step 1: f(${p1.toFixed(2)}) = 0.28x³ - 0.85x = ${val.toFixed(2)} · Step 2: f'(x) = 0.84x² - 0.85 = ${sl.toFixed(3)}`;
+      const rights = ["", "Right to Equality (Art 14-18)", "Right to Freedom (Art 19-22)", "Against Exploitation (Art 23-24)", "Freedom of Religion (Art 25-28)", "Cultural & Ed Rights (Art 29-30)", "Constitutional Remedies (Art 32)"];
+      return `Active Article: ${rights[Math.round(p1)] || ""} · Awareness Score: ${p2}% · Republic Day: 26 Jan 1950`;
     }
     case "14": {
-      const N = Math.max(4, Math.round(p1));
-      const exact = 0.9 * (1 - Math.cos(p2)) + 0.55 * p2;
-      return `Step 1: Slice Δx = ${p2.toFixed(2)}/${N} = ${(p2 / N).toFixed(3)} · Step 2: Exact ∫₀^${p2.toFixed(2)} f(x)dx = ${exact.toFixed(3)}`;
+      const tot = Math.min(543, Math.round(p1 + p2));
+      const status = tot >= 362 ? "2/3 Special Majority" : tot >= 272 ? "Simple Majority (Govt Formed)" : "Hung Parliament (<272)";
+      return `Lok Sabha: ${p1} + ${p2} Allies = ${tot} / 543 Seats -> ${status}`;
     }
-    case "20": {
-      const exprA = String(extras?.exprA || "p1 * sin(x) + p2 * 0.4");
-      const x0 = Number.isFinite(Number(extras?.traceX)) ? Number(extras.traceX) : 0;
-      const y0 = evalMathExpr(exprA, x0, 0, p1, p2);
-      const yp = evalMathExpr(exprA, x0 + 0.002, 0, p1, p2);
-      const ym = evalMathExpr(exprA, x0 - 0.002, 0, p1, p2);
-      const slope = Number.isFinite(yp) && Number.isFinite(ym) ? (yp - ym) / 0.004 : Number.NaN;
-      return `Step 1: Eval ${exprA} at x=${x0.toFixed(2)} ⇒ ${Number.isFinite(y0) ? y0.toFixed(2) : "--"} · Step 2: Numeric Tangent f'(x)=${Number.isFinite(slope) ? slope.toFixed(2) : "--"}`;
+    case "15": {
+      const union = Math.max(0, 100 - p1 - p2);
+      return `Fiscal Devolution -> Gram/Urban Local: ${p1}% | State Govt: ${p2}% | Union Govt: ${union}% (73rd/74th Amend)`;
     }
+    case "16": {
+      const tiers = ["", "District & Sessions Court", "State High Court", "Supreme Court of India"];
+      return `Bench: ${tiers[Math.round(p2)] || ""} · Judicial Autonomy: ${p1}/10 · PIL & Judicial Review guard Constitution`;
+    }
+    case "17": {
+      const vetoed = p2 < 5;
+      const ok = p1 >= 9 && !vetoed;
+      return `UNSC Resolution: ${p1}/15 Votes, ${p2}/5 P5 Concur -> ${ok ? "ADOPTED" : vetoed ? "BLOCKED BY P5 VETO" : "NEEDS 9/15"}`;
+    }
+    case "18": {
+      const pStar = Number(((p1 - (20 - p2)) / 2).toFixed(1));
+      const qStar = Number((p1 - pStar).toFixed(1));
+      return `Qd = ${p1} - P | Qs = ${20 - p2} + P -> Equilibrium P* = ₹${pStar}, Traded Quantity Q* = ${qStar} units`;
+    }
+    case "19": {
+      const pri = Math.max(0, 100 - p1 - p2);
+      return `India GDP Composition -> Primary: ${pri}% · Secondary Industry: ${p1}% · Tertiary Services: ${p2}%`;
+    }
+    case "20":
+    default: {
+      const proj = extras?.polarMode ? "Polar Azimuthal" : "Equirectangular Atlas";
+      const rA = extras?.exprA || "Mumbai -> Suez -> London";
+      const rB = extras?.exprB || "Silk Route (Xi'an -> Rome)";
+      return `${proj} · Center Meridian ${p1}°E | Tilt ${p2}° · Route A: ${rA} | Route B: ${rB}`;
+    }
+  }
+}
+
+export function sampleCurveAudioValue(chapterId, p1, p2, phase) {
+  switch (chapterId) {
+    case "08":
+      return Math.sin(phase * (1 + p1 * 0.15)) * (p2 / 9) * Math.exp(-0.08 * (phase % 6));
+    case "09":
+    case "10":
+      return Math.sin(phase * 0.9) * (p2 / 2400 + 0.35);
+    case "18":
+      return ((p1 - p2) / 140) * 0.7 + Math.sin(phase) * 0.25;
     default:
-      return `Step 1: Tune P1=${p1.toFixed(2)}, P2=${p2.toFixed(2)} · Step 2: Inspect live vector & curve solver in canvas above.`;
+      return Math.sin(phase + Number(p1 || 1) * 0.12) * 0.55;
   }
 }
 
-export function sampleCurveAudioValue(chapterId, p1, p2, phase, extras = {}) {
-  const x = (phase % (Math.PI * 2)) - Math.PI;
-  if (chapterId === "B1") return Math.sin(x * 1.5 + (p1 + p2) * 0.15) * 0.55;
-  if (chapterId === "B2") return Math.sin(x * (p1 / Math.max(1, p2)) * 2.5) * 0.6;
-  if (chapterId === "B3") return Math.cos(x * (p1 * 0.25)) * 0.5;
-  if (chapterId === "B4") return Math.tanh((p1 * p2 - 8) * 0.2) * 0.7;
-  if (chapterId === "B5") return Math.sin(x * (p1 * 0.2 + p2 * 0.2)) * 0.6;
-  if (chapterId === "20") {
-    const v = evalMathExpr(String(extras?.exprA || "p1 * sin(x) + p2 * 0.4"), x, phase * 0.25, p1, p2);
-    return Number.isFinite(v) ? Math.tanh(v * 0.45) : 0;
-  }
-  if (chapterId === "07") return Math.max(-1, Math.min(1, p2 * Math.sin(x * p1)));
-  if (chapterId === "13") return Math.tanh(0.28 * x ** 3 - 0.85 * x + p1 * 0.2);
-  if (chapterId === "14") return Math.tanh(Math.sin(Math.abs(x)) * 0.9 + (p2 - 1.5) * 0.25);
-  return Math.sin(x * (1 + Math.abs(p1) * 0.5) + p2 * 0.6) * 0.65;
-}
+export function renderChapterLabFrame(ctx, w, h, chapterId, p1, p2, t, extras = {}) {
+  applyLabTheme(extras);
+  drawGrid(ctx, w, h, 30);
 
+  const cx = w * 0.5;
+  const cy = h * 0.52;
+  const minDim = Math.min(w, h);
+
+  switch (chapterId) {
+    case "B1": {
+      const r = minDim * 0.32;
+      ctx.strokeStyle = COL.cyan;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      const cardinals = [
+        ["N", 0, COL.pink],
+        ["E", 90, COL.mint],
+        ["S", 180, COL.cyan],
+        ["W", 270, COL.gold],
+      ];
+      ctx.font = "bold 14px monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const [lbl, deg, col] of cardinals) {
+        const a = ((deg - 90) * Math.PI) / 180;
+        ctx.fillStyle = col;
+        ctx.fillText(lbl, cx + Math.cos(a) * (r + 18), cy + Math.sin(a) * (r + 18));
+      }
+
+      // Sun & live shadow vector across dial center
+      const sunProg = (p2 - 6) / 12;
+      const sunX = w * 0.15 + sunProg * (w * 0.7);
+      const sunY = h * 0.18 + Math.pow((sunProg - 0.5) * 2, 2) * (h * 0.16);
+      ctx.fillStyle = COL.gold;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      const shadowDx = (0.5 - sunProg) * r * 1.15;
+      ctx.strokeStyle = COL.axis;
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + shadowDx, cy + 16);
+      ctx.stroke();
+
+      // Compass needle pointing at Bearing p1
+      const na = ((p1 - 90) * Math.PI) / 180;
+      ctx.strokeStyle = COL.pink;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(na) * (r - 12), cy + Math.sin(na) * (r - 12));
+      ctx.stroke();
+      ctx.fillStyle = COL.cream;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawTag(ctx, 14, 14, `BEARING: ${Math.round(p1)}° ${compassLabelForDeg(p1)}`, COL.gold);
+      drawTag(ctx, w - 165, 14, `SUN: ${formatTime12(p2)}`, COL.cyan);
+      return `Bearing ${Math.round(p1)}° (${compassLabelForDeg(p1)}) | Sun ${formatTime12(p2)}`;
+    }
+
+    case "B2": {
+      const marginX = 48;
+      const boxW = w - marginX * 2;
+      const boxH = h - 92;
+      ctx.strokeStyle = COL.cyan;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(marginX, 46, boxW, boxH);
+
+      // River curve + railway line + mountain symbol
+      ctx.strokeStyle = COL.water;
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.moveTo(marginX + 12, 46 + boxH * 0.72);
+      ctx.bezierCurveTo(cx - 40, 46 + boxH * 0.35, cx + 40, 46 + boxH * 0.85, marginX + boxW - 12, 46 + boxH * 0.55);
+      ctx.stroke();
+
+      // Drawn linear span
+      const spanFrac = Math.min(1, p2 / 12);
+      const xStart = marginX + 28;
+      const xEnd = xStart + (boxW - 56) * spanFrac;
+      const routeY = 46 + boxH * 0.36;
+      ctx.strokeStyle = COL.gold;
+      ctx.lineWidth = 4;
+      ctx.setLineDash([7, 5]);
+      ctx.beginPath();
+      ctx.moveTo(xStart, routeY);
+      ctx.lineTo(xEnd, routeY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = COL.pink;
+      ctx.beginPath();
+      ctx.arc(xStart, routeY, 7, 0, Math.PI * 2);
+      ctx.arc(xEnd, routeY, 7, 0, Math.PI * 2);
+      ctx.fill();
+
+      const totalKm = (p1 * p2).toFixed(1);
+      drawTag(ctx, 14, 12, `SCALE: 1 cm = ${p1} km`, COL.cyan);
+      drawTag(ctx, w - 210, 12, `DISTANCE: ${p2} cm = ${totalKm} km`, COL.mint);
+      return `Scale 1 cm : ${p1} km | ${p2} cm = ${totalKm} km`;
+    }
+
+    case "B3": {
+      const zones = [
+        { name: "Himalayas", lat: 33, elev: 92, col: COL.cream },
+        { name: "N. Plains", lat: 27, elev: 28, col: COL.mint },
+        { name: "Thar Desert", lat: 26, elev: 34, col: COL.gold },
+        { name: "Deccan Plateau", lat: 18, elev: 54, col: COL.orange },
+        { name: "Coasts & Islands", lat: 10, elev: 14, col: COL.water },
+      ];
+      const barW = Math.min(82, (w - 80) / zones.length);
+      const baseY = h - 46;
+      zones.forEach((z, idx) => {
+        const bx = 42 + idx * (barW + 14);
+        const bh = (z.elev / 100) * (h - 125);
+        const active = idx + 1 === Math.round(p2) || Math.abs(p1 - z.lat) <= 3;
+        ctx.fillStyle = z.col;
+        ctx.globalAlpha = active ? 0.96 : 0.45;
+        ctx.fillRect(bx, baseY - bh, barW, bh);
+        ctx.globalAlpha = 1;
+        if (active) {
+          ctx.strokeStyle = COL.pink;
+          ctx.lineWidth = 2.5;
+          ctx.strokeRect(bx - 2, baseY - bh - 2, barW + 4, bh + 4);
+        }
+        ctx.fillStyle = COL.cream;
+        ctx.font = "bold 10px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(z.name, bx + barW * 0.5, baseY + 16);
+      });
+      drawTag(ctx, 14, 14, `INDIA LATITUDE: ${p1}°N`, COL.gold);
+      drawTag(ctx, w - 195, 14, `ZONE #${Math.round(p2)} / TROPIC 23.5°N`, COL.mint);
+      return `Lat ${p1}°N | Physiographic Zone ${p2}/5`;
+    }
+
+    case "B4": {
+      const eras = ["", "1. Barter Trade", "2. Silver Rupiya", "3. Paper Rupee ₹", "4. Instant UPI QR"];
+      const era = Math.round(p2);
+      const cards = 4;
+      const cw = Math.min(115, (w - 90) / cards);
+      for (let i = 1; i <= cards; i++) {
+        const x = 35 + (i - 1) * (cw + 14);
+        const active = i === era;
+        ctx.fillStyle = active ? COL.mint : COL.grid;
+        ctx.globalAlpha = active ? 0.25 : 0.7;
+        ctx.strokeStyle = active ? COL.mint : COL.axis;
+        ctx.lineWidth = active ? 3 : 1.5;
+        ctx.beginPath();
+        ctx.roundRect(x, 78, cw, h - 135, 10);
+        ctx.fill();
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = active ? COL.gold : COL.cream;
+        ctx.font = "bold 11px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(eras[i], x + cw * 0.5, 110);
+        ctx.fillStyle = COL.cyan;
+        ctx.fillText(`Qty ${p1}`, x + cw * 0.5, 145);
+        ctx.fillStyle = COL.mint;
+        ctx.fillText(i === 1 ? "Slow Match" : `₹${p1 * 120}`, x + cw * 0.5, 175);
+      }
+      drawTag(ctx, 14, 14, `ERA: ${eras[era] || era}`, COL.gold);
+      drawTag(ctx, w - 180, 14, `TRADE VALUE: ₹${p1 * 120}`, COL.mint);
+      return `${eras[era]} | ${p1} units = ₹${p1 * 120}`;
+    }
+
+    case "B5": {
+      const stages = ["", "Paleolithic", "Mesolithic", "Neolithic Farm", "Wheel & Metal", "Civic Village"];
+      const activeIdx = Math.round(p1);
+      for (let i = 1; i <= 5; i++) {
+        const sx = (w / 6) * i;
+        const sy = h - 60 - i * 26;
+        const active = i <= activeIdx;
+        ctx.fillStyle = active ? COL.mint : COL.tileOff;
+        ctx.beginPath();
+        ctx.arc(sx, sy, i === activeIdx ? 20 : 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = COL.cream;
+        ctx.font = "bold 10px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(stages[i], sx, sy + 30);
+      }
+      drawTag(ctx, 14, 14, `STAGE ${activeIdx}: ${stages[activeIdx]}`, COL.gold);
+      drawTag(ctx, w - 170, 14, `SETTLEMENT POP: ${p2}`, COL.cyan);
+      return `${stages[activeIdx]} | Population ${p2}`;
+    }
+
+    case "00": {
+      const pillars = [
+        { lbl: "1. HISTORY", sub: "Timeline & Sources", col: COL.orange },
+        { lbl: "2. GEOGRAPHY", sub: "Climate & Maps", col: COL.water },
+        { lbl: "3. CIVICS", sub: "Constitution & Law", col: COL.gold },
+        { lbl: "4. ECONOMICS", sub: "Sectors & Trade", col: COL.mint },
+      ];
+      const bw = Math.min(115, (w - 80) / 4);
+      pillars.forEach((p, idx) => {
+        const x = 28 + idx * (bw + 14);
+        const active = idx + 1 === Math.round(p1);
+        const bh = active ? 130 + Math.sin(t * 2) * 8 : 95;
+        ctx.fillStyle = p.col;
+        ctx.globalAlpha = active ? 0.92 : 0.45;
+        ctx.fillRect(x, h - 55 - bh, bw, bh);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = COL.cream;
+        ctx.font = "bold 11px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(p.lbl, x + bw * 0.5, h - 36);
+      });
+      drawTag(ctx, 14, 14, `ACTIVE PILLAR: ${pillars[Math.round(p1) - 1]?.lbl || p1}`, COL.gold);
+      drawTag(ctx, w - 175, 14, `HORIZON: ${p2 * 250} YRS`, COL.cyan);
+      return `${pillars[Math.round(p1) - 1]?.lbl} | Horizon ${p2 * 250} yrs`;
+    }
+
+    case "01": {
+      const n = Math.max(2, Math.round(p1));
+      const pad = 64;
+      const box = Math.min(w - 140, h - 90);
+      const sx = cx - box * 0.5;
+      const sy = 50;
+      const cell = box / n;
+      for (let r = 0; r < n; r++) {
+        for (let c = 0; c < n; c++) {
+          ctx.fillStyle = r === 0 && c === 0 ? COL.water : COL.orange;
+          ctx.globalAlpha = r === 0 && c === 0 ? 0.85 : 0.45;
+          ctx.fillRect(sx + c * cell + 3, sy + r * cell + 3, cell - 6, cell - 6);
+        }
+      }
+      ctx.globalAlpha = 1;
+      // Animated drainage flow lines along streets
+      ctx.strokeStyle = COL.cyan;
+      ctx.lineWidth = 2.5;
+      const flowShift = (t * p2 * 8) % 24;
+      ctx.setLineDash([8, 6]);
+      ctx.lineDashOffset = -flowShift;
+      for (let i = 1; i < n; i++) {
+        ctx.beginPath();
+        ctx.moveTo(sx, sy + i * cell);
+        ctx.lineTo(sx + box, sy + i * cell);
+        ctx.moveTo(sx + i * cell, sy);
+        ctx.lineTo(sx + i * cell, sy + box);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      drawTag(ctx, 14, 14, `HARAPPAN GRID: ${n}×${n}`, COL.gold);
+      drawTag(ctx, w - 175, 14, `DRAIN SLOPE: ${p2}/10`, COL.cyan);
+      return `Harappan ${n}×${n} Grid | Drain Slope ${p2}/10`;
+    }
+
+    case "02": {
+      const reachFrac = p1 / 24;
+      const radius = reachFrac * (minDim * 0.36);
+      ctx.strokeStyle = COL.gold;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      const caps = [
+        { name: "Pataliputra", dx: 0.1, dy: 0 },
+        { name: "Taxila", dx: -0.65, dy: -0.65 },
+        { name: "Ujjain", dx: -0.35, dy: 0.15 },
+        { name: "Tosali", dx: 0.4, dy: 0.35 },
+        { name: "Suvarnagiri", dx: -0.15, dy: 0.72 },
+      ];
+      caps.forEach((cap, i) => {
+        const active = i < Math.round(p2);
+        const px = cx + cap.dx * (minDim * 0.34);
+        const py = cy + cap.dy * (minDim * 0.34);
+        ctx.fillStyle = active ? COL.mint : COL.axis;
+        ctx.beginPath();
+        ctx.arc(px, py, active ? 8 : 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = COL.cream;
+        ctx.font = "bold 10px monospace";
+        ctx.fillText(cap.name, px + 10, py + 3);
+      });
+      drawTag(ctx, 14, 14, `EDICT REACH: ${p1 * 100} km`, COL.gold);
+      drawTag(ctx, w - 165, 14, `PROVINCES: ${Math.round(p2)}/5`, COL.mint);
+      return `Reach ${p1 * 100} km | ${Math.round(p2)}/5 Provinces`;
+    }
+
+    case "03": {
+      const spanPx = Math.min(w - 110, 110 + p1 * 20);
+      const x0 = cx - spanPx * 0.5;
+      const x1 = cx + spanPx * 0.5;
+      const archH = minDim * 0.34 + p2 * 8;
+      ctx.strokeStyle = COL.orange;
+      ctx.lineWidth = 14;
+      ctx.beginPath();
+      ctx.moveTo(x0, h - 42);
+      ctx.lineTo(x0, h - 42 - archH * 0.45);
+      ctx.quadraticCurveTo(cx, h - 42 - archH * 1.15, x1, h - 42 - archH * 0.45);
+      ctx.lineTo(x1, h - 42);
+      ctx.stroke();
+      ctx.fillStyle = COL.gold;
+      ctx.fillRect(cx - 12, h - 42 - archH * 0.86, 24, 18);
+      drawTag(ctx, 14, 14, `ARCH SPAN: ${p1}m`, COL.gold);
+      drawTag(ctx, w - 175, 14, `ZAT RANK: ${p2 * 1000}`, COL.mint);
+      return `True Arch ${p1}m | Mansabdar ${p2 * 1000} Zat`;
+    }
+
+    case "04": {
+      const lineY = cy + 20;
+      ctx.strokeStyle = COL.gold;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(45, lineY);
+      ctx.lineTo(w - 45, lineY);
+      ctx.stroke();
+
+      const marks = [
+        [1857, "1857"],
+        [1885, "1885"],
+        [1905, "1905"],
+        [1920, "1920"],
+        [1930, "1930 Dandi"],
+        [1942, "1942"],
+        [1947, "1947"],
+      ];
+      marks.forEach(([yr, lbl]) => {
+        const mx = 45 + ((yr - 1857) / 90) * (w - 90);
+        const passed = yr <= p1;
+        ctx.fillStyle = passed ? COL.mint : COL.axis;
+        ctx.beginPath();
+        ctx.arc(mx, lineY, 7, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = COL.cream;
+        ctx.font = "bold 10px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(lbl, mx, lineY + 22);
+      });
+      const curX = 45 + ((p1 - 1857) / 90) * (w - 90);
+      ctx.fillStyle = COL.pink;
+      ctx.fillRect(curX - 4, lineY - 42 - p2 * 0.4, 8, 42 + p2 * 0.4);
+      drawTag(ctx, 14, 14, `YEAR: ${Math.round(p1)} AD`, COL.gold);
+      drawTag(ctx, w - 165, 14, `PARTICIPATION: ${p2}%`, COL.mint);
+      return `Year ${Math.round(p1)} AD | Civic Reach ${p2}%`;
+    }
+
+    case "05": {
+      // Spinning gear + rising literacy curve
+      const gr = minDim * 0.2;
+      const gx = w * 0.28;
+      ctx.save();
+      ctx.translate(gx, cy);
+      ctx.rotate(t * p1 * 0.45);
+      ctx.strokeStyle = COL.gold;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(0, 0, gr, 0, Math.PI * 2);
+      ctx.stroke();
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * gr * 0.4, Math.sin(a) * gr * 0.4);
+        ctx.lineTo(Math.cos(a) * (gr + 10), Math.sin(a) * (gr + 10));
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Print Literacy curve
+      ctx.strokeStyle = COL.mint;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      for (let i = 0; i <= 20; i++) {
+        const u = i / 20;
+        const px = w * 0.48 + u * (w * 0.44);
+        const py = h - 48 - Math.pow(u, 1.4) * ((p1 + p2) / 20) * (h - 98);
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      drawTag(ctx, 14, 14, `STEAM RPM: ${p1}x`, COL.gold);
+      drawTag(ctx, w - 175, 14, `PRINT SCALE: ${p2}x`, COL.mint);
+      return `Steam ${p1}x | Print Scale ${p2}x`;
+    }
+
+    case "06": {
+      const nBlocs = Math.round(p2);
+      const ringR = minDim * 0.3;
+      const pts = [];
+      for (let i = 0; i < nBlocs; i++) {
+        const a = (i / nBlocs) * Math.PI * 2 + t * 0.18;
+        pts.push([cx + Math.cos(a) * ringR, cy + Math.sin(a) * ringR]);
+      }
+      ctx.strokeStyle = p1 >= 0.7 ? COL.mint : p1 >= 0.45 ? COL.gold : COL.pink;
+      ctx.lineWidth = 1.6;
+      for (let i = 0; i < pts.length; i++) {
+        for (let j = i + 1; j < pts.length; j++) {
+          if ((i + j) % Math.max(1, Math.round(3 - p1 * 2)) === 0) {
+            ctx.beginPath();
+            ctx.moveTo(pts[i][0], pts[i][1]);
+            ctx.lineTo(pts[j][0], pts[j][1]);
+            ctx.stroke();
+          }
+        }
+      }
+      pts.forEach(([x, y]) => {
+        ctx.fillStyle = COL.cyan;
+        ctx.beginPath();
+        ctx.arc(x, y, 8, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      drawTag(ctx, 14, 14, `BLOCS: ${nBlocs}`, COL.cyan);
+      drawTag(ctx, w - 175, 14, `CO-OP: ${Math.round(p1 * 100)}%`, COL.mint);
+      return `${nBlocs} Blocs | Cooperation ${Math.round(p1 * 100)}%`;
+    }
+
+    case "07": {
+      const gr = minDim * 0.34;
+      ctx.fillStyle = COL.water;
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      ctx.arc(cx, cy, gr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = COL.cyan;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, gr, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Equator + Tropic of Cancer
+      ctx.strokeStyle = COL.gold;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - gr, cy);
+      ctx.lineTo(cx + gr, cy);
+      ctx.stroke();
+
+      // Selected Longitude Meridian & Latitude Point
+      const lx = cx + (p1 / 180) * gr;
+      const ly = cy - (p2 / 90) * gr;
+      ctx.strokeStyle = COL.pink;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(lx, cy - Math.sqrt(Math.max(0, gr * gr - (lx - cx) ** 2)));
+      ctx.lineTo(lx, cy + Math.sqrt(Math.max(0, gr * gr - (lx - cx) ** 2)));
+      ctx.stroke();
+      ctx.fillStyle = COL.mint;
+      ctx.beginPath();
+      ctx.arc(lx, ly, 7, 0, Math.PI * 2);
+      ctx.fill();
+
+      const istDiff = (p1 / 15).toFixed(1);
+      drawTag(ctx, 14, 14, `LON: ${p1}° (GMT ${p1 >= 0 ? "+" : ""}${istDiff}h)`, COL.gold);
+      drawTag(ctx, w - 145, 14, `LAT: ${p2}°`, COL.mint);
+      return `Lat ${p2}° | Lon ${p1}° (GMT ${p1 >= 0 ? "+" : ""}${istDiff}h)`;
+    }
+
+    case "08": {
+      // Tectonic Plates + Mountain Uplift + Live Seismograph Waveform
+      const uplift = p1 * 5.2;
+      ctx.fillStyle = COL.orange;
+      ctx.fillRect(40, h - 75, cx - 55, 28);
+      ctx.fillStyle = COL.water;
+      ctx.fillRect(cx + 15, h - 75, cx - 55, 28);
+      ctx.fillStyle = COL.cream;
+      ctx.beginPath();
+      ctx.moveTo(cx - 65, h - 75);
+      ctx.lineTo(cx, h - 75 - uplift);
+      ctx.lineTo(cx + 65, h - 75);
+      ctx.fill();
+
+      // Live Richter trace
+      ctx.strokeStyle = COL.pink;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let i = 0; i <= 80; i++) {
+        const u = i / 80;
+        const px = 42 + u * (w - 84);
+        const amp = (p2 - 1.5) * 7 * Math.exp(-Math.pow((u - ((t * 0.45) % 1)) * 6, 2));
+        const py = 105 + Math.sin(i * 1.4 + t * 14) * amp;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+      drawTag(ctx, 14, 14, `CONVERGENCE: ${p1} cm/yr`, COL.gold);
+      drawTag(ctx, w - 165, 14, `RICHTER: M ${p2.toFixed(1)}`, COL.pink);
+      return `Plate Speed ${p1} cm/yr | Quake M${p2.toFixed(1)}`;
+    }
+
+    case "09": {
+      // Western Ghats barrier + Wind arrows + Rain curtain
+      const ghatX = cx + 30;
+      ctx.fillStyle = COL.mint;
+      ctx.beginPath();
+      ctx.moveTo(ghatX - 55, h - 42);
+      ctx.lineTo(ghatX, h - 165);
+      ctx.lineTo(ghatX + 65, h - 42);
+      ctx.fill();
+
+      // Animated SW Monsoon wind arrows
+      ctx.strokeStyle = COL.cyan;
+      ctx.lineWidth = 3;
+      const windSpeed = p1 * 3.5;
+      for (let r = 0; r < 4; r++) {
+        const offset = ((t * windSpeed * 12 + r * 45) % (ghatX - 40));
+        const ax = 36 + offset;
+        const ay = h - 68 - r * 28 - offset * 0.28;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(ax + 34, ay - 14);
+        ctx.stroke();
+      }
+
+      // Rain drops on windward side
+      ctx.strokeStyle = COL.water;
+      ctx.lineWidth = 2;
+      const nDrops = Math.round(p2 / 6);
+      for (let d = 0; d < nDrops; d++) {
+        const dx = ghatX - 95 + (d * 11) % 95;
+        const dy = 78 + ((t * 95 + d * 29) % 130);
+        ctx.beginPath();
+        ctx.moveTo(dx, dy);
+        ctx.lineTo(dx - 4, dy + 12);
+        ctx.stroke();
+      }
+      drawTag(ctx, 14, 14, `ΔT GRADIENT: ${p1}°C`, COL.gold);
+      drawTag(ctx, w - 165, 14, `HUMIDITY: ${p2}%`, COL.cyan);
+      return `Monsoon ΔT ${p1}°C | Humidity ${p2}%`;
+    }
+
+    case "10": {
+      // 12-Month River Hydrograph (Jan..Dec)
+      const months = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+      const barW = Math.min(28, (w - 100) / 12 - 6);
+      months.forEach((m, i) => {
+        const bx = 50 + i * (barW + 8);
+        const rainWeight = i >= 5 && i <= 8 ? 1.0 : i === 9 ? 0.55 : 0.12;
+        const totalFlow = p1 * 0.65 + (p2 / 2400) * 100 * rainWeight;
+        const bh = Math.min(h - 115, (totalFlow / 120) * (h - 115));
+        ctx.fillStyle = i >= 5 && i <= 8 ? COL.cyan : COL.mint;
+        ctx.fillRect(bx, h - 48 - bh, barW, bh);
+        ctx.fillStyle = COL.cream;
+        ctx.font = "bold 10px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(m, bx + barW * 0.5, h - 32);
+      });
+      drawTag(ctx, 14, 14, `SNOWMELT: ${p1}%`, COL.cyan);
+      drawTag(ctx, w - 165, 14, `MONSOON: ${p2} mm`, COL.mint);
+      return `Snowmelt ${p1}% | Annual Rain ${p2} mm`;
+    }
+
+    case "11": {
+      const soils = [
+        { name: "1. Alluvial", crops: "Rice, Wheat", col: COL.gold },
+        { name: "2. Black Regur", crops: "Cotton, Soybean", col: COL.axis },
+        { name: "3. Red Iron", crops: "Millets, Pulses", col: COL.pink },
+        { name: "4. Laterite", crops: "Tea, Cashew", col: COL.orange },
+      ];
+      const bw = Math.min(110, (w - 80) / 4);
+      soils.forEach((s, i) => {
+        const x = 32 + i * (bw + 14);
+        const active = i + 1 === Math.round(p1);
+        ctx.fillStyle = s.col;
+        ctx.globalAlpha = active ? 0.92 : 0.4;
+        ctx.fillRect(x, 76, bw, h - 135);
+        ctx.globalAlpha = 1;
+        if (active) {
+          ctx.strokeStyle = COL.mint;
+          ctx.lineWidth = 3;
+          ctx.strokeRect(x, 76, bw, h - 135);
+        }
+        ctx.fillStyle = COL.cream;
+        ctx.font = "bold 10px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(s.name, x + bw * 0.5, h - 38);
+      });
+      drawTag(ctx, 14, 14, `${soils[Math.round(p1) - 1]?.name || "Soil"}`, COL.gold);
+      drawTag(ctx, w - 165, 14, `MOISTURE: ${p2}%`, COL.mint);
+      return `${soils[Math.round(p1) - 1]?.crops} | Moisture ${p2}%`;
+    }
+
+    case "12": {
+      const clean = Math.min(100, p1 + p2);
+      const fossil = Math.max(0, 100 - clean);
+      const barY = cy - 24;
+      const barW = w - 90;
+      const sw = (p1 / 100) * barW;
+      const hw = (Math.min(p2, 100 - p1) / 100) * barW;
+      const fw = Math.max(0, barW - sw - hw);
+      ctx.fillStyle = COL.mint;
+      ctx.fillRect(45, barY, sw, 48);
+      ctx.fillStyle = COL.cyan;
+      ctx.fillRect(45 + sw, barY, hw, 48);
+      ctx.fillStyle = COL.pink;
+      ctx.fillRect(45 + sw + hw, barY, fw, 48);
+      ctx.strokeStyle = COL.cream;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(45, barY, barW, 48);
+      drawTag(ctx, 14, 14, `CLEAN ENERGY: ${clean}%`, COL.mint);
+      drawTag(ctx, w - 165, 14, `FOSSIL: ${fossil}%`, COL.pink);
+      return `Clean ${clean}% (${p1}% Solar/Wind + ${p2}% Hydro) | Coal ${fossil}%`;
+    }
+
+    case "13": {
+      const titles = ["Equality", "Freedom", "No Exploit", "Religion", "Cultural", "Art 32 Writ"];
+      const r = minDim * 0.31;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+        const px = cx + Math.cos(a) * r;
+        const py = cy + Math.sin(a) * r;
+        const active = i + 1 === Math.round(p1);
+        ctx.strokeStyle = active ? COL.mint : COL.grid;
+        ctx.lineWidth = active ? 4 : 2;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(px, py);
+        ctx.stroke();
+        ctx.fillStyle = active ? COL.mint : COL.violet;
+        ctx.beginPath();
+        ctx.arc(px, py, active ? 20 : 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = COL.cream;
+        ctx.font = "bold 10px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(titles[i], px, py + 28);
+      }
+      drawTag(ctx, 14, 14, `RIGHT #${Math.round(p1)}: ${titles[Math.round(p1) - 1]}`, COL.gold);
+      drawTag(ctx, w - 165, 14, `CIVIC SCORE: ${p2}%`, COL.mint);
+      return `Right #${Math.round(p1)} (${titles[Math.round(p1) - 1]}) | Score ${p2}%`;
+    }
+
+    case "14": {
+      // 543-Seat Semicircle Parliament Hemicycle
+      const rOut = minDim * 0.38;
+      const seats = Math.min(543, Math.round(p1 + p2));
+      const baseAngle = Math.PI;
+      const partyFrac = Math.min(1, p1 / 543);
+      const totalFrac = Math.min(1, seats / 543);
+      ctx.lineWidth = 26;
+      ctx.strokeStyle = COL.tileOff;
+      ctx.beginPath();
+      ctx.arc(cx, h - 52, rOut, baseAngle, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = COL.mint;
+      ctx.beginPath();
+      ctx.arc(cx, h - 52, rOut, baseAngle, baseAngle + Math.PI * partyFrac);
+      ctx.stroke();
+
+      ctx.strokeStyle = COL.gold;
+      ctx.beginPath();
+      ctx.arc(cx, h - 52, rOut, baseAngle + Math.PI * partyFrac, baseAngle + Math.PI * totalFrac);
+      ctx.stroke();
+
+      // 272 Majority needle
+      ctx.strokeStyle = COL.pink;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cx, h - 52);
+      ctx.lineTo(cx, h - 52 - rOut - 20);
+      ctx.stroke();
+
+      drawTag(ctx, 14, 14, `COALITION: ${seats} / 543 SEATS`, seats >= 272 ? COL.mint : COL.pink);
+      drawTag(ctx, w - 180, 14, `272 MAJORITY | 362 SPECIAL`, COL.gold);
+      return `Lok Sabha ${seats}/543 (${p1} + ${p2} allies)`;
+    }
+
+    case "15": {
+      const union = Math.max(0, 100 - p1 - p2);
+      const tiers = [
+        { lbl: `Union (${union}%)`, val: union, col: COL.cyan, w: w * 0.34 },
+        { lbl: `State (${p2}%)`, val: p2, col: COL.gold, w: w * 0.54 },
+        { lbl: `Local Panchayat (${p1}%)`, val: p1, col: COL.mint, w: w * 0.74 },
+      ];
+      tiers.forEach((tr, i) => {
+        const y = 78 + i * 54;
+        ctx.fillStyle = tr.col;
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        ctx.roundRect(cx - tr.w * 0.5, y, tr.w, 40, 8);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = "#171537";
+        ctx.font = "bold 12px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(tr.lbl, cx, y + 24);
+      });
+      drawTag(ctx, 14, 14, `LOCAL SHARE: ${p1}%`, COL.mint);
+      drawTag(ctx, w - 165, 14, `UNION REMAINS: ${union}%`, COL.cyan);
+      return `Local ${p1}% | State ${p2}% | Union ${union}%`;
+    }
+
+    case "16": {
+      const tilt = ((8 - p1) * 3.5 * Math.PI) / 180;
+      ctx.strokeStyle = COL.gold;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(cx, 75);
+      ctx.lineTo(cx, h - 48);
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(cx, 118);
+      ctx.rotate(tilt);
+      ctx.strokeStyle = COL.cyan;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(-110, 0);
+      ctx.lineTo(110, 0);
+      ctx.stroke();
+      ctx.fillStyle = COL.mint;
+      ctx.beginPath();
+      ctx.arc(-110, 34, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = COL.pink;
+      ctx.beginPath();
+      ctx.arc(110, 34, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      const tiers = ["", "District Court", "High Court", "Supreme Court"];
+      drawTag(ctx, 14, 14, `BENCH: ${tiers[Math.round(p2)] || p2}`, COL.gold);
+      drawTag(ctx, w - 175, 14, `AUTONOMY: ${p1}/10`, COL.mint);
+      return `${tiers[Math.round(p2)]} | Autonomy ${p1}/10`;
+    }
+
+    case "17": {
+      const seats = 15;
+      const votes = Math.round(p1);
+      const p5 = Math.round(p2);
+      const rad = minDim * 0.31;
+      for (let i = 0; i < seats; i++) {
+        const a = (i / seats) * Math.PI * 2 - Math.PI / 2;
+        const px = cx + Math.cos(a) * rad;
+        const py = cy + Math.sin(a) * rad;
+        const isP5 = i < 5;
+        const ok = isP5 ? i < p5 : i < votes;
+        ctx.fillStyle = ok ? (isP5 ? COL.gold : COL.mint) : COL.pink;
+        ctx.beginPath();
+        ctx.arc(px, py, isP5 ? 11 : 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const adopted = votes >= 9 && p5 === 5;
+      drawTag(ctx, 14, 14, adopted ? "UNSC RESOLUTION ADOPTED" : p5 < 5 ? "BLOCKED BY P5 VETO" : "NEEDS 9/15", adopted ? COL.mint : COL.pink);
+      drawTag(ctx, w - 160, 14, `VOTES: ${votes}/15 · P5: ${p5}/5`, COL.gold);
+      return `UNSC ${votes}/15 | P5 Concur ${p5}/5`;
+    }
+
+    case "18": {
+      // Supply & Demand curves on Q (x) vs Price (y)
+      const ox = 56;
+      const oy = h - 42;
+      const gw = w - 104;
+      const gh = h - 88;
+      ctx.strokeStyle = COL.axis;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ox, 44);
+      ctx.lineTo(ox, oy);
+      ctx.lineTo(ox + gw, oy);
+      ctx.stroke();
+
+      const pMax = 140;
+      const mapX = (q) => ox + (Math.max(0, Math.min(pMax, q)) / pMax) * gw;
+      const mapY = (pr) => oy - (Math.max(0, Math.min(pMax, pr)) / pMax) * gh;
+
+      // Demand: Q = p1 - P => P = p1 - Q
+      ctx.strokeStyle = COL.pink;
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(mapX(0), mapY(p1));
+      ctx.lineTo(mapX(p1), mapY(0));
+      ctx.stroke();
+
+      // Supply: Q = (20 - p2) + P -> when P=0, Q = 20 - p2 -> wait P = Q - (20 - p2) -> actually shift right when p2 rises: Qs = (p2 - 20) + P
+      // Keep simple matching evaluateChapterMission: Qd = p1 - P, Qs = (20 - p2) + P? Wait earlier: P* = (p1 - (20 - p2))/2 -> Qd = Qs => p1 - P = (20 - p2) + P => if p2 increases, Q* lowers? Let's make Qs = p2 + P so P* = (p1 - p2)/2 and Q* = (p1 + p2)/2! Wait let's match mission cleanly.
+      const pStar = Number(((p1 - (20 - p2)) / 2).toFixed(1));
+      const qStar = Number((p1 - pStar).toFixed(1));
+      ctx.strokeStyle = COL.mint;
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(mapX(Math.max(0, 20 - p2)), mapY(0));
+      ctx.lineTo(mapX(Math.min(140, 120 + (20 - p2))), mapY(120));
+      ctx.stroke();
+
+      ctx.fillStyle = COL.gold;
+      ctx.beginPath();
+      ctx.arc(mapX(qStar), mapY(pStar), 8, 0, Math.PI * 2);
+      ctx.fill();
+      drawTag(ctx, 14, 14, `EQUILIBRIUM P* = ₹${pStar}`, COL.gold);
+      drawTag(ctx, w - 165, 14, `QUANTITY Q* = ${qStar}`, COL.mint);
+      return `Equilibrium P*=₹${pStar} | Q*=${qStar} units`;
+    }
+
+    case "19": {
+      const pri = Math.max(0, 100 - p1 - p2);
+      const items = [
+        { lbl: `Primary (${pri}%)`, val: pri, col: COL.mint },
+        { lbl: `Industry (${p1}%)`, val: p1, col: COL.orange },
+        { lbl: `Services (${p2}%)`, val: p2, col: COL.cyan },
+      ];
+      const bw = Math.min(110, (w - 110) / 3);
+      items.forEach((it, i) => {
+        const bx = 56 + i * (bw + 24);
+        const bh = Math.max(12, (it.val / 80) * (h - 110));
+        ctx.fillStyle = it.col;
+        ctx.fillRect(bx, h - 46 - bh, bw, bh);
+        ctx.fillStyle = COL.cream;
+        ctx.font = "bold 11px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(it.lbl, bx + bw * 0.5, h - 26);
+      });
+      drawTag(ctx, 14, 14, `PRIMARY: ${pri}%`, COL.mint);
+      drawTag(ctx, w - 190, 14, `IND ${p1}% · SVC ${p2}%`, COL.cyan);
+      return `GDP: Primary ${pri}% | Industry ${p1}% | Services ${p2}%`;
+    }
+
+    case "20":
+    default: {
+      const showGraticule = extras?.showTangent !== false;
+      const showTrade = Boolean(extras?.showIntegral);
+      const polarMode = Boolean(extras?.polarMode);
+      const routeA = extras?.exprA || "Mumbai -> Suez -> London";
+      const routeB = extras?.exprB || "Silk Route (Xi'an -> Rome)";
+
+      if (polarMode) {
+        const r = minDim * 0.36;
+        ctx.fillStyle = COL.water;
+        ctx.globalAlpha = 0.22;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = COL.cyan;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+
+        if (showGraticule) {
+          ctx.strokeStyle = COL.axis;
+          ctx.lineWidth = 1;
+          for (const k of [0.35, 0.7]) {
+            ctx.beginPath();
+            ctx.arc(cx, cy, r * k, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          for (let a = 0; a < 8; a++) {
+            const rad = (a * Math.PI) / 4 + ((p1 * Math.PI) / 180) * 0.25;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(rad) * r, cy + Math.sin(rad) * r);
+            ctx.stroke();
+          }
+        }
+        if (showTrade) {
+          ctx.strokeStyle = COL.gold;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(cx + r * 0.45, cy + r * 0.2);
+          ctx.quadraticCurveTo(cx, cy - r * 0.15, cx - r * 0.55, cy - r * 0.1);
+          ctx.stroke();
+        }
+      } else {
+        const mx = 42;
+        const my = 48;
+        const mw = w - 84;
+        const mh = h - 92;
+        ctx.fillStyle = COL.water;
+        ctx.globalAlpha = 0.2;
+        ctx.fillRect(mx, my, mw, mh);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = COL.cyan;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(mx, my, mw, mh);
+
+        if (showGraticule) {
+          ctx.strokeStyle = COL.axis;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(mx, my + mh * 0.5);
+          ctx.lineTo(mx + mw, my + mh * 0.5);
+          const merX = mx + ((p1 + 180) / 360) * mw;
+          ctx.moveTo(merX, my);
+          ctx.lineTo(merX, my + mh);
+          ctx.stroke();
+        }
+
+        // Stylized Continents
+        ctx.fillStyle = COL.mint;
+        ctx.globalAlpha = 0.52;
+        ctx.fillRect(mx + mw * 0.12, my + mh * 0.18, mw * 0.18, mh * 0.28); // N America
+        ctx.fillRect(mx + mw * 0.23, my + mh * 0.52, mw * 0.11, mh * 0.32); // S America
+        ctx.fillRect(mx + mw * 0.44, my + mh * 0.42, mw * 0.14, mh * 0.34); // Africa
+        ctx.fillRect(mx + mw * 0.45, my + mh * 0.14, mw * 0.4, mh * 0.32); // Eurasia + India
+        ctx.fillRect(mx + mw * 0.74, my + mh * 0.58, mw * 0.13, mh * 0.18); // Australia
+        ctx.globalAlpha = 1;
+
+        // Animated Great-Circle maritime routes
+        const indiaX = mx + mw * 0.68;
+        const indiaY = my + mh * 0.44;
+        const londonX = mx + mw * 0.48;
+        const londonY = my + mh * 0.22;
+        const tokyoX = mx + mw * 0.84;
+        const tokyoY = my + mh * 0.32;
+
+        ctx.strokeStyle = COL.gold;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(indiaX, indiaY);
+        ctx.quadraticCurveTo(mx + mw * 0.55, my + mh * 0.46 - p2 * 0.6, londonX, londonY);
+        ctx.stroke();
+
+        if (showTrade) {
+          ctx.strokeStyle = COL.pink;
+          ctx.lineWidth = 3;
+          ctx.setLineDash([7, 5]);
+          ctx.beginPath();
+          ctx.moveTo(indiaX, indiaY);
+          ctx.quadraticCurveTo(mx + mw * 0.78, my + mh * 0.52, tokyoX, tokyoY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        ctx.fillStyle = COL.gold;
+        ctx.beginPath();
+        ctx.arc(indiaX, indiaY, 6, 0, Math.PI * 2);
+        ctx.arc(londonX, londonY, 5, 0, Math.PI * 2);
+        ctx.arc(tokyoX, tokyoY, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      drawTag(ctx, 14, 14, `${polarMode ? "POLAR" : "FLAT"} · ${p1}°E`, COL.gold);
+      drawTag(ctx, w - 210, 14, showTrade ? `A:${routeA.slice(0, 18)}` : `TILT ${p2}°`, COL.mint);
+      return `Atlas ${polarMode ? "Polar" : "Equirect"} | ${p1}°E | ${routeA} & ${routeB}`;
+    }
+  }
+}

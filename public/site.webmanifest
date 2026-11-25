@@ -1,7 +1,7 @@
 {
-  "name": "MATH_LAND",
-  "short_name": "MATH_LAND",
-  "description": "Playable pixel-art handheld console exploring the live animated 3D MATH_LAND voxel world and 20 interactive math & AI chapters.",
+  "name": "SST-LAB",
+  "short_name": "SST-LAB",
+  "description": "Playable pixel-art handheld console exploring the live animated 3D SST-LAB voxel world and 26 interactive CBSE Class 1-12 Social Science labs.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f3ebda",

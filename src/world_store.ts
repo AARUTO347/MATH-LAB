@@ -273,7 +273,7 @@ export class WorldStore {
   private terrainZones: WorldTerrainZone[] = [];
   private villagers: WorldVillager[] = [];
   private baseContributorCount = 101;
-  private lastWeaveNote = "MATH_LAND humming quietly in the sun.";
+  private lastWeaveNote = "SST-LAB humming quietly in the sun.";
   private lastWeaveAt = Date.now();
   private lastWeaveCount = 0;
   private lastAuditAt = Date.now();
@@ -330,7 +330,7 @@ export class WorldStore {
       this.baseContributorCount = Number(bundled.contributorCount) || 101;
       this.lastWeaveNote =
         typeof bundled.lastWeaveNote === "string" && bundled.lastWeaveNote
-          ? bundled.lastWeaveNote
+          ? bundled.lastWeaveNote.replace(/GeminIsland|GEMINISLAND|MATH[-_]LAND/g, "SST-LAB")
           : this.lastWeaveNote;
       this.lastWeaveCount = this.creations.length;
     } else {
@@ -378,7 +378,7 @@ export class WorldStore {
           this.version = disk.version;
         }
         if (typeof disk.lastWeaveNote === "string" && disk.lastWeaveNote) {
-          this.lastWeaveNote = disk.lastWeaveNote.replace(/GeminIsland|GEMINISLAND|MATH-LAND/g, "MATH_LAND");
+          this.lastWeaveNote = disk.lastWeaveNote.replace(/GeminIsland|GEMINISLAND|MATH[-_]LAND/g, "SST-LAB");
         }
       }
     } catch {
@@ -402,6 +402,15 @@ export class WorldStore {
     this.creations = policyFiltered.creations;
     this.paths = policyFiltered.paths;
     this.props = policyFiltered.props;
+
+    for (const c of this.creations) {
+      if (c.liveFeed?.place) {
+        c.liveFeed.place = c.liveFeed.place.replace(/GeminIsland|GEMINISLAND|MATH[-_]LAND/g, "SST-LAB");
+      }
+      if (c.blueprint?.liveFeed?.place) {
+        c.blueprint.liveFeed.place = c.blueprint.liveFeed.place.replace(/GeminIsland|GEMINISLAND|MATH[-_]LAND/g, "SST-LAB");
+      }
+    }
 
     const mathCampusChanged = ensureMathCampusCreations(this.creations, this.paths);
 
@@ -1117,7 +1126,7 @@ export class WorldStore {
         ok: false,
         status: 429,
         retryAfterSec: 20,
-        error: "The MATH_LAND build queue is full right now — please try again in 20 seconds.",
+        error: "The SST-LAB build queue is full right now — please try again in 20 seconds.",
       };
     }
 

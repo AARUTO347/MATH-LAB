@@ -586,12 +586,14 @@ export async function startServer(customPort?: number) {
           return jsonResponse(request, { ok: false, error: parsedBody.error }, parsedBody.status);
         }
         const body = parsedBody.data;
-        const chapterTitle = sanitizePlainText(body.chapterTitle, 120, true) || "Math Lab";
+        const chapterTitle = sanitizePlainText(body.chapterTitle, 120, true) || "SST Lab";
         const formulaSummary = sanitizePlainText(body.formulaSummary, 240, true);
         const readout = sanitizePlainText(body.readout, 220, true);
         const question = sanitizePlainText(body.question, 320, true);
         const modelPref = sanitizePlainText(body.modelPref, 48, true);
-        const promptCheck = checkIslandContentPolicy(`${chapterTitle} ${question}`);
+        const promptCheck = checkIslandContentPolicy(`${chapterTitle} ${question}`, {
+          educationalMode: true,
+        });
         if (!promptCheck.allowed) {
           return jsonResponse(request, { ok: false, error: promptCheck.reason }, 400);
         }
@@ -612,7 +614,7 @@ export async function startServer(customPort?: number) {
           fallbackModel: env.FALLBACK_MODEL,
           overrideModels,
           systemPrompt:
-            "You are the friendly MATH_LAND Interactive Audio Tutor for a pixel-art gaming console created by AARUTO + DIPU-_-. Reply with strict JSON only: {\"explanation\": string, \"keyFormula\": string, \"tryTip\": string}. Keep explanation clear, vivid, accurate, and 2-3 short sentences suitable to read aloud.",
+            "You are the friendly SST-LAB CBSE Social Science Tutor (History, Geography, Civics & Economics) for a pixel-art gaming console created by AARUTO + DIPU-_-. Reply with strict JSON only: {\"explanation\": string, \"keyFormula\": string, \"tryTip\": string}. Keep explanation clear, accurate, engaging, and 2-3 short sentences suitable to read aloud.",
           userText: [
             `Chapter: ${chapterTitle}`,
             formulaSummary ? `Live step breakdown: ${formulaSummary}` : "",
@@ -690,7 +692,7 @@ export async function startServer(customPort?: number) {
             ? {
                 text,
                 speechMetadata: {
-                  style: "Clear, warm, upbeat interactive math tutor",
+                  style: "Clear, warm, upbeat interactive social science tutor",
                 },
               }
             : { text };

@@ -2374,8 +2374,11 @@ function createAbacusFrameController(creation, group) {
       counts[row] = (counts[row] + 1) % 6;
       syncBeadTargets();
       const value = counts[0] * 100 + counts[1] * 10 + counts[2];
+      const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+      const bearing = (value * 45) % 360;
+      const dir = dirs[Math.round(bearing / 45) % 8];
       playTone(392 + row * 110 + counts[row] * 35, 0.12, "triangle", 0.075);
-      return `Basic Park Abacus — Count = ${value} (${counts[0]}×100 + ${counts[1]}×10 + ${counts[2]})`;
+      return `Basic SST Compass & Tally — Bearing ${bearing}° (${dir}) · Count ${value}`;
     },
     step(dt) {
       for (let row = 0; row < 3; row++) {
@@ -2433,8 +2436,15 @@ function createFractionStandController(creation, group) {
       slices.forEach((s, i) => {
         s.pop = i < f.count ? 1 : 0;
       });
+      const zones = [
+        "Himalayan Mountains",
+        "Northern Fertile Plains",
+        "Thar Desert & Coastal Plains",
+        "Peninsular Deccan Plateau",
+        "All 6 Physiographic Zones of India",
+      ];
       playArpeggio([440, 554.37, 659.25], 0.055, 0.14, "triangle", 0.07);
-      return `Fraction Pizza Stand — Highlighted ${f.label} (${f.count}/${f.total} slices)`;
+      return `India Landforms Kiosk — Studying ${zones[fracIdx % zones.length]} (${f.label})`;
     },
     step(dt, t) {
       const f = fractions[fracIdx];
@@ -2488,8 +2498,14 @@ function createBalanceScaleController(creation, group) {
       ensureAudio();
       idx = (idx + 1) % puzzles.length;
       const p = puzzles[idx];
+      const tradeLabels = [
+        "1 Sack Grain = 10 Silver Coins (Fair Barter Balance)",
+        "Grain Shortage — Demand Rises!",
+        "Bumper Harvest — Supply Surplus!",
+        "UPI Digital Settlement = 100% Balanced!",
+      ];
       playArpeggio(p.tilt === 0 ? [523.25, 659.25, 783.99] : [392, 349.23], 0.06, 0.16, "triangle", 0.075);
-      return `Algebra Balance Scale — ${p.eq}`;
+      return `Barter & Rupee Trade Scale — ${tradeLabels[idx % tradeLabels.length]}`;
     },
     step(dt, t) {
       const targetRot = puzzles[idx].tilt + (puzzles[idx].tilt === 0 ? Math.sin(t * 2.2) * 0.03 : 0);
@@ -2542,8 +2558,9 @@ function createPendulumTowerController(creation, group) {
       omega = omega > 3.0 ? 2.4 : 3.4;
       chimeBoost = 6.0;
       const period = ((Math.PI * 2) / omega).toFixed(2);
+      const richter = (3.4 + amp * 3.8).toFixed(1);
       playTone(587.33, 0.14, "sine", 0.07);
-      return `Galileo Pendulum — T = 2π√(L/g) ≈ ${period}s (Amp ${(amp * 57.3).toFixed(0)}°)`;
+      return `Richter Seismograph — Magnitude ${richter} Tremor · Wave Period ${period}s`;
     },
     step(dt, t) {
       const ang = Math.sin(t * omega) * amp;
@@ -2607,7 +2624,7 @@ function createRocketPadController(creation, group) {
       flightT = 0;
       playBurstNoise(0.28, 0.075);
       playArpeggio([261.63, 392, 523.25, 783.99], 0.07, 0.2, "sawtooth", 0.06);
-      return "Kinematics Rocket — T-0 Ignition! Tracing h(t) = v₀t - ½gt²!";
+      return "INSAT Weather Satellite — T-0 Ignition! Tracking Monsoon Cloud Bands!";
     },
     step(dt, t) {
       if (flightT >= 0) {
@@ -2683,7 +2700,7 @@ function createFerrisWheelController(creation, group) {
       ensureAudio();
       speedMult = speedMult === 1 ? 2.2 : speedMult === 2.2 ? 3.5 : 1;
       playArpeggio([392, 493.88, 587.33], 0.055, 0.14, "triangle", 0.07);
-      return `Sine Ferris Wheel — Speed ${speedMult}x · y(t) = R·sin(ωt) + h`;
+      return `Heritage Observation Wheel — Survey Speed ${speedMult}x Across SST-LAB!`;
     },
     step(dt) {
       angle += dt * 0.65 * speedMult;

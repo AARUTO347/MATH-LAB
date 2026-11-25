@@ -21,7 +21,7 @@ export function buildColossalWaterfallBlueprint(): VoxelBlueprint {
         "Northwest coastal waterfall cascading beside the ocean shore and feeding fresh mountain water into the island's streams.",
       category: "prop",
       scaleClass: "colossal",
-      liveFeed: { kind: "weather", place: "MATH_LAND", lat: -33.87, lon: 151.21 },
+      liveFeed: { kind: "weather", place: "SST-LAB", lat: -33.87, lon: 151.21 },
       palette: {
         graniteDark: "#656d76",
         granite: "#818a93",

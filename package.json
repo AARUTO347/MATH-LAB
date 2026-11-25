@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "[ -d node_modules/.bin ] || bun install || npm install",
     "dev": "tsx server.ts",
-    "prebuild": "[ -d node_modules/.bin ] || bun install || npm install",
+    "prebuild": "tsx scripts/export_world_snapshot.ts",
     "build": "vite build",
     "prelint": "[ -d node_modules/.bin ] || bun install || npm install",
     "lint": "tsc --noEmit",

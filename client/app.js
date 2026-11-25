@@ -18,6 +18,68 @@ import {
   playMissionFanfare,
   playFireworkBurst,
 } from "./sound_fx.js";
+import { buildLocalProceduralCreation } from "./local_sculptor.js";
+
+async function fetchJsonSafe(url, options) {
+  const res = await fetch(url, options);
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  if (!ct.includes("application/json")) {
+    return { ok: false, isJson: false, status: res.status, data: null };
+  }
+  const data = await res.json();
+  return { ok: res.ok, isJson: true, status: res.status, data };
+}
+
+const LOCAL_CREATIONS_STORAGE_KEY = "sstlab_local_creations_v1";
+
+function loadLocalCreations() {
+  try {
+    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(LOCAL_CREATIONS_STORAGE_KEY) : null;
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalCreation(creation) {
+  if (!creation || !creation.id) return;
+  try {
+    const existing = loadLocalCreations().filter((c) => c && c.id !== creation.id);
+    existing.push(creation);
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(LOCAL_CREATIONS_STORAGE_KEY, JSON.stringify(existing.slice(-25)));
+    }
+  } catch {
+    // Ignore storage quota / sandbox restrictions
+  }
+}
+
+function mergeLocalCreationsIntoWorld(world) {
+  if (!world || !Array.isArray(world.creations)) return world;
+  const locals = loadLocalCreations();
+  if (!locals.length) return world;
+  const seen = new Set(world.creations.map((c) => c.id));
+  const merged = [...world.creations];
+  for (const c of locals) {
+    if (c && c.id && !seen.has(c.id)) {
+      merged.push(c);
+      seen.add(c.id);
+    }
+  }
+  return {
+    ...world,
+    creations: merged,
+    myCreationId: world.myCreationId || locals[locals.length - 1]?.id || null,
+  };
+}
+
+function buildOfflineSstTutorReply(ch, p1, p2, extras, question) {
+  const live = getStepByStepBreakdown(ch.id, p1, p2, extras);
+  const qNote = question ? `Focus (${question}): ` : "";
+  return `${qNote}${ch.syllabus} Real-life link: ${ch.realLife} Live readout: ${live}. Tip: ${ch.mission?.hint || "Adjust sliders or click SPEAK TTS!"} [SST-LAB Local Tutor]`;
+}
 
 // Anti-copy & smooth touch-screen gameplay guards (allow typing/copy inside input & textarea fields)
 document.addEventListener("contextmenu", (e) => {
@@ -366,7 +428,7 @@ engine = createMeadowWorldEngine(
         playFireworkBurst();
         markDiscovered("math-dev-hq", "AARUTO + DIPU-_- Dev Arcade HQ", 25);
         completeQuest("visit_dev_hq");
-        showToast('AARUTO + DIPU-_- Dev Arcade HQ — "Welcome to MATH_LAND!"', 4200);
+        showToast('AARUTO + DIPU-_- Dev Arcade HQ — "Welcome to SST-LAB!"', 4200);
         return;
       }
       if (creation.id.startsWith("math-park-")) {
@@ -1029,8 +1091,42 @@ sculptBtn.addEventListener("click", async () => {
   }
   syncDockUI();
 
+  const finishWithLocalCreation = () => {
+    const localCreation = buildLocalProceduralCreation({
+      prompt,
+      x: spotX,
+      z: spotZ,
+      imageUsed: Boolean(selectedImageDataUrl),
+    });
+    saveLocalCreation(localCreation);
+    const baseWorld =
+      worldData && Array.isArray(worldData.creations)
+        ? worldData
+        : {
+            creations: [],
+            paths: [],
+            zones: [],
+            villagers: [],
+            worldRadius: 170,
+          };
+    worldData = mergeLocalCreationsIntoWorld({
+      ...baseWorld,
+      creations: [...baseWorld.creations, localCreation],
+      myCreationId: localCreation.id,
+    });
+    sculptBtn.disabled = false;
+    myCreationId = localCreation.id;
+    readyCreation = localCreation;
+    engine.applyWorldSnapshot(worldData);
+    uiState = "ready";
+    syncDockUI();
+    awardXp(30);
+    syncScoreTelemetry();
+    showToast(`Built "${localCreation.name}" on SST-LAB! (Saved in browser)`, 3800);
+  };
+
   try {
-    const res = await fetch("/api/build", {
+    const { ok, isJson, status, data } = await fetchJsonSafe("/api/build", {
       method: "POST",
       headers: buildVisitorHeaders({
         "content-type": "application/json",
@@ -1043,12 +1139,15 @@ sculptBtn.addEventListener("click", async () => {
         z: spotZ,
       }),
     });
-    const data = await res.json();
+    if (!isJson || status === 404 || status >= 500 || /GEMINI_API_KEY|offline/i.test(data?.error || "")) {
+      finishWithLocalCreation();
+      return;
+    }
     if (data?.visitorToken) storeVisitorToken(data.visitorToken);
 
-    if (!res.ok || !data.ok) {
+    if (!ok || !data?.ok) {
       sculptBtn.disabled = false;
-      if (data.alreadyPlaced && data.myCreationId) {
+      if (data?.alreadyPlaced && data?.myCreationId) {
         myCreationId = data.myCreationId;
         uiState = "placed";
         syncDockUI();
@@ -1056,7 +1155,7 @@ sculptBtn.addEventListener("click", async () => {
       }
       uiState = "composing";
       syncDockUI();
-      showFormError(data.error || "Could not build that right now — try again.");
+      showFormError(data?.error || "Could not build that right now — try again.");
       return;
     }
 
@@ -1067,7 +1166,7 @@ sculptBtn.addEventListener("click", async () => {
 
     // Direct synchronous fallback if ever returned
     sculptBtn.disabled = false;
-    worldData = data.world;
+    worldData = mergeLocalCreationsIntoWorld(data.world);
     myCreationId = data.creation.id;
     readyCreation = data.creation;
     if (data.feeds) engine.applyLiveFeeds(data.feeds);
@@ -1075,10 +1174,7 @@ sculptBtn.addEventListener("click", async () => {
     uiState = "ready";
     syncDockUI();
   } catch {
-    sculptBtn.disabled = false;
-    uiState = "composing";
-    syncDockUI();
-    showFormError("Network hiccup while building — try again.");
+    finishWithLocalCreation();
   }
 });
 
@@ -1091,29 +1187,50 @@ promptInput.addEventListener("keydown", (e) => {
 
 async function refreshLiveFeeds() {
   try {
-    const res = await fetch("/api/feeds");
-    if (!res.ok) return;
-    const data = await res.json();
-    if (data.ok && data.feeds) {
-      engine.applyLiveFeeds(data.feeds);
+    const live = await fetchJsonSafe("/api/feeds");
+    if (live.ok && live.data?.ok && live.data?.feeds) {
+      engine.applyLiveFeeds(live.data.feeds);
+      return;
+    }
+    const snap = await fetchJsonSafe("/feeds-snapshot.json");
+    if (snap.ok && snap.data?.feeds) {
+      engine.applyLiveFeeds(snap.data.feeds);
+    } else if (snap.ok && snap.data) {
+      engine.applyLiveFeeds(snap.data);
     }
   } catch {
     // ignore transient feed errors
   }
 }
 
+async function fetchWorldDataWithStaticFallback() {
+  try {
+    const live = await fetchJsonSafe("/api/world", {
+      headers: buildVisitorHeaders(),
+    });
+    if (live.ok && live.isJson && live.data && Array.isArray(live.data.creations) && live.data.creations.length > 0) {
+      return mergeLocalCreationsIntoWorld(live.data);
+    }
+  } catch {
+    // Fall back to static bundled snapshot below
+  }
+  const snap = await fetchJsonSafe("/world-snapshot.json");
+  if (snap.ok && snap.isJson && snap.data) {
+    return mergeLocalCreationsIntoWorld(snap.data);
+  }
+  return null;
+}
+
 async function refreshDailyEligibility() {
   if (isOgCapture || uiState === "building" || uiState === "ready") return;
   try {
-    const res = await fetch("/api/world", {
-      headers: buildVisitorHeaders(),
-    });
-    if (!res.ok) return;
-    const latest = await res.json();
+    const latest = await fetchWorldDataWithStaticFallback();
+    if (!latest) return;
     if (latest?.visitorToken) storeVisitorToken(latest.visitorToken);
     worldData = latest;
-    myCreationId = latest.myCreationId || null;
+    myCreationId = latest.myCreationId || myCreationId || null;
     engine.applyWorldSnapshot(worldData);
+    syncScoreTelemetry();
     if (latest.myActiveJob && !myCreationId) {
       startTrackingJob(latest.myActiveJob);
     } else if (!myCreationId && uiState === "placed") {
@@ -1180,7 +1297,7 @@ function handleWorldMessage(msg) {
       msg.creation.id !== myCreationId &&
       uiState !== "building"
     ) {
-      showToast(`Someone added "${msg.creation.name}" to MATH_LAND!`, 4200);
+      showToast(`Someone added "${msg.creation.name}" to SST-LAB!`, 4200);
     }
     syncScoreTelemetry();
   }
@@ -1230,11 +1347,9 @@ window.__geminIslandMp = mpClient;
 
 async function initWorld() {
   try {
-    const res = await fetch("/api/world", {
-      headers: buildVisitorHeaders(),
-    });
-    if (res.ok) {
-      worldData = await res.json();
+    const initial = await fetchWorldDataWithStaticFallback();
+    if (initial) {
+      worldData = initial;
       if (worldData?.visitorToken) storeVisitorToken(worldData.visitorToken);
       myCreationId = worldData.myCreationId || myCreationId || null;
       engine.applyWorldSnapshot(worldData);
@@ -1262,7 +1377,7 @@ async function initWorld() {
   }
 }
 
-// ---------------- PIXBOY Console Hardware, 20-Chapter Rack & Interactive Math Labs ----------------
+// ---------------- PIXBOY Console Hardware, 26-Chapter Rack & Interactive SST Labs ----------------
 const gradeFilterBar = document.getElementById("grade-filter-bar");
 const chapterRackEl = document.getElementById("chapter-rack");
 const attractionRackEl = document.getElementById("attraction-rack");
@@ -1365,19 +1480,19 @@ const scoreMasteryEl = document.getElementById("score-mastery");
 const scoreChapterEl = document.getElementById("score-chapter");
 
 const WORLD_QUESTS = [
-  { id: "enter_house", title: "Cozy House Visitor", desc: "Walk into the MATH_LAND Cozy House or click HOUSE.", xp: 35, action: () => visitWorldAttraction({ id: "math-house-clubhouse", label: "Cozy House & Quests", desc: "Enter to explore Quest Book, 4-Ch TV & Honey Tea" }) },
+  { id: "enter_house", title: "Cozy House Visitor", desc: "Walk into the SST-LAB Cozy House or click HOUSE.", xp: 35, action: () => visitWorldAttraction({ id: "math-house-clubhouse", label: "Cozy House & Quests", desc: "Enter to explore Quest Book, 4-Ch Atlas TV & Honey Tea" }) },
   { id: "open_quest_book", title: "Scholar's Quest Book", desc: "Open the Quest Book inside Cozy House or press QUESTS.", xp: 30 },
-  { id: "tv_channel", title: "4-Channel Math TV", desc: "Switch channels on the retro TV inside Cozy House.", xp: 25 },
+  { id: "tv_channel", title: "4-Channel Atlas TV", desc: "Switch channels on the retro TV inside Cozy House.", xp: 25 },
   { id: "brew_tea", title: "Cozy Honey Tea", desc: "Brew steaming honey tea at the Cozy House coffee table.", xp: 25 },
-  { id: "drive_car", title: "Island Speedster", desc: "Drive the Roadster, Rally Coupe, or Dune Buggy (press E near car).", xp: 40, action: () => visitWorldAttraction({ id: "math-turbo-roadster", label: "Crimson Roadster", desc: "Press E near any car to drive" }) },
-  { id: "ride_train", title: "Express Rail Passenger", desc: "Board the MATH_LAND Express steam train loop.", xp: 40, action: () => visitWorldAttraction({ id: "math-express-train", label: "MATH_LAND Express", desc: "Press E to board the steam train" }) },
+  { id: "drive_car", title: "Island Expedition Driver", desc: "Drive the Roadster, Rally Coupe, or Dune Buggy (press E near car).", xp: 40, action: () => visitWorldAttraction({ id: "math-turbo-roadster", label: "Crimson Roadster", desc: "Press E near any car to drive" }) },
+  { id: "ride_train", title: "Express Rail Passenger", desc: "Board the SST-LAB Express steam train loop.", xp: 40, action: () => visitWorldAttraction({ id: "math-express-train", label: "SST-LAB Express", desc: "Press E to board the heritage train" }) },
   { id: "visit_dev_hq", title: "Creator Celebration", desc: "Trigger fireworks at AARUTO + DIPU-_- Dev Arcade HQ.", xp: 30, action: () => visitWorldAttraction(WORLD_ATTRACTIONS[0]) },
-  { id: "visit_basic_park", title: "Basic Math Park Explorer", desc: "Play with the Abacus, Fraction Stand, or Balance Scale in Basic Math Park.", xp: 35, action: () => visitWorldAttraction(WORLD_ATTRACTIONS.find((a) => a.id === "math-park-abacus")) },
-  { id: "visit_exp_yard", title: "Experiment Yard Scientist", desc: "Test the Pendulum Tower, Rocket Launch Pad, or Ferris Wheel in Experiment Yard.", xp: 40, action: () => visitWorldAttraction(WORLD_ATTRACTIONS.find((a) => a.id === "math-exp-rocket")) },
-  { id: "run_experiment", title: "Real-Life Math Experiment", desc: "Activate EXPMT mode & click a trial button inside any interactive lab.", xp: 40, action: () => openMathLabById("06") },
-  { id: "solve_graph_lab", title: "Graphing Studio Explorer", desc: "Open Chapter 20 Graphing Studio and test f(x) or Polar r(θ).", xp: 40, action: () => openMathLabById("20") },
-  { id: "ask_gemini", title: "Ask Gemini Math Tutor", desc: "Ask Gemini 2.5 Flash for a breakdown inside any Math Lab.", xp: 35 },
-  { id: "listen_tts", title: "Spoken Audio Lesson", desc: "Listen to a spoken Gemini TTS audio lesson.", xp: 35 },
+  { id: "visit_basic_park", title: "Basic SST Park Explorer", desc: "Play with the Cardinal Compass, India Landforms Kiosk, or Barter Scale in Basic SST Park.", xp: 35, action: () => visitWorldAttraction(WORLD_ATTRACTIONS.find((a) => a.id === "math-park-abacus")) },
+  { id: "visit_exp_yard", title: "Field Experiment Explorer", desc: "Test the Richter Seismograph, INSAT Weather Pad, or Heritage Wheel in Experiment Yard.", xp: 40, action: () => visitWorldAttraction(WORLD_ATTRACTIONS.find((a) => a.id === "math-exp-rocket")) },
+  { id: "run_experiment", title: "Real-Life SST Experiment", desc: "Activate EXPMT mode & click a trial button inside any interactive SST lab.", xp: 40, action: () => openMathLabById("08") },
+  { id: "solve_graph_lab", title: "World Atlas Studio", desc: "Open Chapter 20 World Atlas & Trade Studio and toggle Graticule, Trade, or Polar mode.", xp: 40, action: () => openMathLabById("20") },
+  { id: "ask_gemini", title: "Ask Gemini SST Tutor", desc: "Ask Gemini 2.5 Flash (or Local Tutor) inside any SST Lab.", xp: 35 },
+  { id: "listen_tts", title: "Spoken Audio Lesson", desc: "Listen to a spoken Gemini TTS or voice SST audio lesson.", xp: 35 },
 ];
 
 const PROGRESS_STORAGE_KEY = "mathland_progress_v1";
@@ -1439,7 +1554,7 @@ function renderQuestDialog() {
   const head = document.createElement("div");
   head.className = "quest-head";
   const h2 = document.createElement("h2");
-  h2.textContent = `MATH_LAND QUEST BOOK (${doneCount}/${WORLD_QUESTS.length})`;
+  h2.textContent = `SST-LAB QUEST BOOK (${doneCount}/${WORLD_QUESTS.length})`;
   const headActions = document.createElement("div");
   headActions.className = "quest-head-actions";
 
@@ -1450,8 +1565,8 @@ function renderQuestDialog() {
   speakBtn.addEventListener("click", () => {
     const remaining = WORLD_QUESTS.filter((q) => !explorerProgress.questsDone.includes(q.id));
     const msg = remaining.length
-      ? `Welcome to MATH_LAND! You have completed ${doneCount} of ${WORLD_QUESTS.length} quests. Next quest: ${remaining[0].title}. ${remaining[0].desc}`
-      : `Congratulations! You completed all ${WORLD_QUESTS.length} quests in MATH_LAND built by AARUTO and DIPU!`;
+      ? `Welcome to SST-LAB! You have completed ${doneCount} of ${WORLD_QUESTS.length} quests. Next quest: ${remaining[0].title}. ${remaining[0].desc}`
+      : `Congratulations! You completed all ${WORLD_QUESTS.length} quests in SST-LAB built by AARUTO and DIPU!`;
     void speakWithGeminiTts(msg, speakBtn);
   });
 
@@ -1541,11 +1656,11 @@ function isChapterMastered(ch) {
 }
 
 function getExplorerRank(xp) {
-  if (xp >= 800) return "MATH_LAND Legend";
-  if (xp >= 450) return "Euler Scholar";
-  if (xp >= 220) return "Tensor Architect";
-  if (xp >= 80) return "Algebra Scout";
-  return "Voxel Novice";
+  if (xp >= 800) return "SST-LAB Legend";
+  if (xp >= 450) return "History Laureate";
+  if (xp >= 220) return "Constitution Scholar";
+  if (xp >= 80) return "Cartographer Scout";
+  return "SST Pioneer";
 }
 
 function maybeCelebrateRankUp(prevXp, nextXp) {
@@ -1606,8 +1721,8 @@ const labExtras = {
   showTangent: true,
   showIntegral: false,
   polarMode: false,
-  exprA: "p1 * sin(x) + p2 * 0.4",
-  exprB: "0.35 * x^2 - 1",
+  exprA: "Mumbai -> Suez -> London",
+  exprB: "Silk Route (Xi'an -> Rome)",
   expMode: false,
   expBusStops: 0,
   expCartItems: 1,
@@ -1901,7 +2016,7 @@ function loadChapterIntoLabUI(idx) {
   if (mlBadgeEl) mlBadgeEl.textContent = `CH ${ch.id}`;
   if (mlCbseBadgeEl) mlCbseBadgeEl.textContent = ch.cbseClass || "Class 11–12";
   if (mlTitleEl) mlTitleEl.textContent = ch.title;
-  if (screenFooterTitle) screenFooterTitle.textContent = labOpen ? `CH ${ch.id} · ${ch.title.toUpperCase()}` : "MATH_LAND 3D";
+  if (screenFooterTitle) screenFooterTitle.textContent = labOpen ? `CH ${ch.id} · ${ch.title.toUpperCase()}` : "SST-LAB 3D";
   if (mlP1Name) mlP1Name.textContent = ch.p1Label;
   if (mlP1Range) {
     mlP1Range.min = String(ch.p1Min);
@@ -2009,7 +2124,7 @@ function closeMathLab() {
   labOpen = false;
   stopCurveSonifier();
   if (mathLabOverlay) mathLabOverlay.hidden = true;
-  if (screenFooterTitle) screenFooterTitle.textContent = "MATH_LAND 3D";
+  if (screenFooterTitle) screenFooterTitle.textContent = "SST-LAB 3D";
 }
 
 function setConsolePaused(next) {
@@ -2191,35 +2306,33 @@ mlExpActionBtn?.addEventListener("click", () => {
   playConfirm();
   completeQuest("run_experiment");
   if (ch.id === "B1") {
-    labExtras.expBusStops += 1;
-    const nextB = Math.min(ch.p2Max, Math.round(labP2) + 1);
-    applyLabParams(labP1, nextB > ch.p2Max ? 1 : nextB);
-  } else if (ch.id === "B2") {
-    const b = Math.max(2, Math.round(labP2));
-    const nextA = (Math.round(labP1) % b) + 1;
-    applyLabParams(nextA, b);
-  } else if (ch.id === "B3") {
-    labExtras.expCartItems = (labExtras.expCartItems % 6) + 1;
-    showToast(`Scanned item #${labExtras.expCartItems} into Supermarket Receipt!`, 2000);
-  } else if (ch.id === "B4") {
-    const a = Math.max(1, Math.round(labP1));
-    const exactX = Number(Math.min(ch.p2Max, 8 / a).toFixed(1));
-    applyLabParams(a, exactX);
-    showToast(`Solved ${a}x + 2 = 10 -> x = ${exactX}!`, 2400);
-  } else if (ch.id === "B5") {
-    const nextL = Math.round(labP1) >= ch.p1Max ? ch.p1Min : Math.round(labP1) + 1;
-    applyLabParams(nextL, labP2);
-  } else if (ch.id === "06") {
-    runProbabilityBatch(25);
-    showToast(`Rolled 25 live trials (total ${labExtras.expTrials.totalRuns})!`, 2200);
+    const nextBearing = (Math.round(labP1) + 45) % 360;
+    applyLabParams(nextBearing, labP2);
+  } else if (ch.id === "04") {
+    const milestones = [1857, 1885, 1905, 1920, 1930, 1942, 1947];
+    const nextYr = milestones.find((m) => m > Math.round(labP1)) ?? milestones[0];
+    applyLabParams(nextYr, nextYr === 1947 ? 100 : labP2);
+    showToast(`Chronicle Step: ${nextYr} AD`, 2000);
   } else if (ch.id === "07") {
-    const nextP1 = Number((labP1 + 0.5 > ch.p1Max ? ch.p1Min : labP1 + 0.5).toFixed(2));
-    applyLabParams(nextP1, labP2);
+    const nextLon = labP1 + 15 > ch.p1Max ? ch.p1Min : labP1 + 15;
+    applyLabParams(nextLon, labP2);
+  } else if (ch.id === "08") {
+    const nextMag = labP2 + 0.5 > ch.p2Max ? 4.0 : Number((labP2 + 0.5).toFixed(1));
+    applyLabParams(labP1, nextMag);
+    showToast(`Seismograph Shockwave: M${nextMag.toFixed(1)}!`, 2000);
   } else if (ch.id === "14") {
-    labSimTime = 0;
-    applyLabParams(labP1, Math.min(ch.p2Max, Math.max(1.5, labP2 + 0.3)));
+    const nextSeats = labP1 + 30 > ch.p1Max ? 180 : labP1 + 30;
+    applyLabParams(nextSeats, labP2);
+  } else if (ch.id === "20") {
+    labExtras.showIntegral = true;
+    mlIntegralBtn?.classList.add("is-active");
+    labExtras.polarMode = !labExtras.polarMode;
+    mlPolarBtn?.classList.toggle("is-active", labExtras.polarMode);
+    showToast(`Projection: ${labExtras.polarMode ? "Polar Hemisphere" : "Flat Equirectangular"}`, 2200);
   } else {
-    labSimTime += 0.45;
+    const nextP1 = Number((labP1 + ch.p1Step > ch.p1Max ? ch.p1Min : labP1 + ch.p1Step).toFixed(2));
+    applyLabParams(nextP1, labP2);
+    showToast(`${ch.experimentTitle || ch.title}`, 2000);
   }
 });
 
@@ -2250,7 +2363,7 @@ mlSnapBtn?.addEventListener("click", () => {
   if (!mathLabCanvas) return;
   const ch = MATH_CHAPTERS[activeChapterIdx];
   const a = document.createElement("a");
-  a.download = `math_land_ch_${ch.id}.png`;
+  a.download = `sst_lab_ch_${ch.id}.png`;
   a.href = mathLabCanvas.toDataURL("image/png");
   a.click();
   playConfirm();
@@ -2258,11 +2371,11 @@ mlSnapBtn?.addEventListener("click", () => {
 });
 
 mlExprAInput?.addEventListener("input", () => {
-  labExtras.exprA = mlExprAInput.value || "p1 * sin(x) + p2 * 0.4";
+  labExtras.exprA = mlExprAInput.value || "Mumbai -> Suez -> London";
 });
 
 mlExprBInput?.addEventListener("input", () => {
-  labExtras.exprB = mlExprBInput.value || "";
+  labExtras.exprB = mlExprBInput.value || "Silk Route (Xi'an -> Rome)";
 });
 
 // Live Web Audio Curve Sonifier
@@ -2351,7 +2464,7 @@ async function speakWithGeminiTts(rawText, triggerBtn) {
   }
   try {
     const ttsMode = mlTtsEngineSelect?.value || "auto";
-    const res = await fetch("/api/gemini/tts", {
+    const { ok, isJson, data } = await fetchJsonSafe("/api/gemini/tts", {
       method: "POST",
       headers: buildVisitorHeaders({
         "content-type": "application/json",
@@ -2359,15 +2472,14 @@ async function speakWithGeminiTts(rawText, triggerBtn) {
       }),
       body: JSON.stringify({ text: cleanText, voiceName: "Kore", ttsMode }),
     });
-    const data = await res.json();
-    if (res.ok && data?.ok && data?.audioBase64) {
+    if (ok && isJson && data?.ok && data?.audioBase64) {
       const mime = data.mimeType || "audio/wav";
       activeTtsAudio = new Audio(`data:${mime};base64,${data.audioBase64}`);
       await activeTtsAudio.play();
       completeQuest("listen_tts");
       return;
     }
-    throw new Error(data?.error || "TTS unavailable");
+    throw new Error(data?.error || "TTS offline fallback");
   } catch {
     if (typeof window.speechSynthesis !== "undefined") {
       const u = new SpeechSynthesisUtterance(cleanText);
@@ -2394,7 +2506,7 @@ async function askGeminiTutor() {
   if (mlTutorAskBtn) mlTutorAskBtn.disabled = true;
   mlTutorAnswerEl.textContent = `Thinking with ${modelPref}...`;
   try {
-    const res = await fetch("/api/gemini/explain", {
+    const { ok, isJson, data } = await fetchJsonSafe("/api/gemini/explain", {
       method: "POST",
       headers: buildVisitorHeaders({
         "content-type": "application/json",
@@ -2408,19 +2520,20 @@ async function askGeminiTutor() {
         modelPref,
       }),
     });
-    const data = await res.json();
-    if (!res.ok || !data?.ok) {
-      mlTutorAnswerEl.textContent = data?.error || "Could not reach Gemini Tutor right now.";
+    if (!ok || !isJson || !data?.ok) {
+      mlTutorAnswerEl.textContent = buildOfflineSstTutorReply(ch, labP1, labP2, labExtras, question);
+      completeQuest("ask_gemini");
       return;
     }
     const parts = [data.explanation];
-    if (data.keyFormula) parts.push(`Formula: ${data.keyFormula}`);
+    if (data.keyFormula) parts.push(`Key Concept: ${data.keyFormula}`);
     if (data.tryTip) parts.push(`Try: ${data.tryTip}`);
     if (data.modelUsed) parts.push(`[${data.modelUsed}]`);
     mlTutorAnswerEl.textContent = parts.filter(Boolean).join(" · ");
     completeQuest("ask_gemini");
   } catch {
-    mlTutorAnswerEl.textContent = "Network hiccup reaching Gemini Tutor.";
+    mlTutorAnswerEl.textContent = buildOfflineSstTutorReply(ch, labP1, labP2, labExtras, question);
+    completeQuest("ask_gemini");
   } finally {
     if (mlTutorAskBtn) mlTutorAskBtn.disabled = false;
   }
@@ -2472,8 +2585,8 @@ function getWorldTourStops() {
       z: -10.8,
       zoom: 1.5,
       id: "math-sign",
-      label: "MATH_LAND Welcome Sign",
-      toast: "Tour Stop: MATH_LAND Town Sign — MADE BY AARUTO + DIPU-_-",
+      label: "SST-LAB Welcome Sign",
+      toast: "Tour Stop: SST-LAB Town Sign — MADE BY AARUTO + DIPU-_-",
     },
     ...WORLD_ATTRACTIONS.map((a) => ({
       kind: "attraction",
@@ -2584,7 +2697,7 @@ bezelSkyBtn?.addEventListener("click", () => {
   syncSkyButtonUI();
   playBlip(mode === "night" ? 420 : mode === "sunset" ? 560 : 680);
   const label = mode === "night" ? "Starlight Night" : mode === "sunset" ? "Golden Sunset" : "Sunlit Day";
-  showToast(`MATH_LAND Sky: ${label}`, 2600);
+  showToast(`SST-LAB Sky: ${label}`, 2600);
 });
 
 bezelSfxBtn?.addEventListener("click", () => {
@@ -2756,7 +2869,7 @@ driveHornBtn?.addEventListener("click", () => engine?.blowVehicleHorn?.());
 driveExitBtn?.addEventListener("click", () => engine?.exitCarDrive?.());
 trainWhistleBtn?.addEventListener("click", () => {
   engine?.blowVehicleHorn?.();
-  showToast("CHOO-CHOO! MATH_LAND Express rolling along the island rail loop!", 2800);
+  showToast("CHOO-CHOO! SST-LAB Express rolling along the island rail loop!", 2800);
 });
 trainExitBtn?.addEventListener("click", () => engine?.hopOffCurrentVehicle?.());
 

@@ -1280,7 +1280,7 @@ export function buildCharacterAvatarRig(appearance, options = {}) {
     }
 
     if (isOpening && !isDriving) {
-      // "World Come From Hand" Opening Reveal: both palms lift symmetrically outward as if presenting MATH_LAND!
+      // "World Come From Hand" Opening Reveal: both palms lift symmetrically outward as if presenting SST-LAB!
       const p = Math.max(0, Math.min(1, Number(openingTimer) / 1.6));
       const blossom = Math.sin(p * Math.PI);
       const lift = Math.max(0.45, blossom);
@@ -1349,7 +1349,7 @@ export function buildCharacterAvatarRig(appearance, options = {}) {
       bodyPivot.position.set(0, smoothBodyLift, 0);
     }
 
-    // Animate miniature voxel MATH_LAND globe summoned from outstretched hands
+    // Animate miniature voxel SST-LAB globe summoned from outstretched hands
     const handReveal = isOpening
       ? Math.sin(Math.max(0.05, Math.min(1, Number(openingTimer) / 1.65)) * Math.PI)
       : actionTimer > 0.04

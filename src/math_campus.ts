@@ -63,10 +63,10 @@ export const MATH_CHAPTER_MONUMENTS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "00",
     id: "math-ch-00",
-    name: "Ch.00 Algebra Overview Pavilion",
+    name: "Ch.00 SST-LAB 4-Pillar Atlas Hub",
     description:
-      "Interactive linear algebra hub showcasing 3D transform matrices, neural nets, gradient descent, and vector embeddings.",
-    statusLine: "Inspect Ch.00 Algebra & AI Overview Lab",
+      "Interactive CBSE Social Science pavilion uniting History, Geography, Civics & Economics timelines and spatial models.",
+    statusLine: "Inspect Ch.00 SST-LAB 4-Pillar Atlas Lab",
     preferredX: 28,
     preferredZ: -26,
     scaleClass: "medium",
@@ -77,94 +77,94 @@ export const MATH_CHAPTER_MONUMENTS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "01",
     id: "math-ch-01",
-    name: "Ch.01 Complex Plane Spire",
+    name: "Ch.01 Indus Valley Citadel Spire",
     description:
-      "Argand plane monument & roots-of-unity rotor modeling AC impedance, signal processing, and quantum amplitudes.",
-    statusLine: "Inspect Ch.01 Complex Numbers & Quadratics",
+      "Harappan & Mohenjo-daro planned urban grid monument showcasing baked brick drainage, Great Bath & granary trade.",
+    statusLine: "Inspect Ch.01 Indus Valley Civilization Lab",
     preferredX: 46,
     preferredZ: -24,
     scaleClass: "medium",
-    accentColor: "purple",
+    accentColor: "terracotta",
     secondaryColor: "amber",
     motif: "argand_spire",
   },
   {
     chapterNum: "02",
     id: "math-ch-02",
-    name: "Ch.02 Matrices & Determinants Gate",
+    name: "Ch.02 Mauryan Ashoka Pillar Gate",
     description:
-      "3D shear & determinant monument demonstrating Cramer's rule, Eigen-transforms, and graphics pipelines.",
-    statusLine: "Inspect Ch.02 Matrices & Determinants Lab",
+      "Sarnath Lion Capital & Mauryan edict gateway celebrating Dhamma inscriptions, Pataliputra governance & Silk routes.",
+    statusLine: "Inspect Ch.02 Mauryan Empire & Ashoka Lab",
     preferredX: 58,
     preferredZ: -8,
     scaleClass: "medium",
-    accentColor: "teal",
-    secondaryColor: "yellow",
+    accentColor: "gold",
+    secondaryColor: "teal",
     motif: "matrix_gate",
   },
   {
     chapterNum: "03",
     id: "math-ch-03",
-    name: "Ch.03 Permutations Tower",
+    name: "Ch.03 Sultanate & Mughal Arch",
     description:
-      "Combinatorial staircase and rotating cipher wheel for circular permutations, routing, and cryptography.",
-    statusLine: "Inspect Ch.03 Permutations & Combinations",
+      "Stepped red-sandstone & marble synthesis pavilion exploring medieval court administration, Mansabdari & heritage architecture.",
+    statusLine: "Inspect Ch.03 Delhi Sultanate & Mughal Lab",
     preferredX: 58,
     preferredZ: 14,
     scaleClass: "medium",
-    accentColor: "orange",
-    secondaryColor: "sky",
+    accentColor: "crimson",
+    secondaryColor: "cream",
     motif: "combo_stair",
   },
   {
     chapterNum: "04",
     id: "math-ch-04",
-    name: "Ch.04 Binomial & Pascal Pyramid",
+    name: "Ch.04 Freedom Struggle Timeline Spire",
     description:
-      "Stepped Pascal's triangle monument visualizing binomial coefficients, induction steps, and risk modeling.",
-    statusLine: "Inspect Ch.04 Induction & Binomial Lab",
+      "Stepped 1857-to-1947 historical pyramid tracing Swadeshi, Dandi March & constitutional awakening across modern India.",
+    statusLine: "Inspect Ch.04 1857 & Freedom Struggle Lab",
     preferredX: 48,
     preferredZ: 34,
     scaleClass: "medium",
-    accentColor: "gold",
+    accentColor: "orange",
     secondaryColor: "indigo",
     motif: "pascal_pyramid",
   },
   {
     chapterNum: "05",
     id: "math-ch-05",
-    name: "Ch.05 Sequences & Series Helix",
+    name: "Ch.05 Industrial & Printing Helix",
     description:
-      "Rising AP/GP/HP progression spiral visualizing convergent series sums and compound growth.",
-    statusLine: "Inspect Ch.05 Sequences & Series Lab",
+      "Steam engine, spinning jenny & Gutenberg print helix visualizing world revolutions and industrial urbanization.",
+    statusLine: "Inspect Ch.05 World Revolutions & Industry Lab",
     preferredX: 30,
     preferredZ: 48,
     scaleClass: "medium",
-    accentColor: "lime",
-    secondaryColor: "magenta",
+    accentColor: "amber",
+    secondaryColor: "slateLight",
     motif: "series_spiral",
   },
   {
     chapterNum: "06",
     id: "math-ch-06",
-    name: "Ch.06 Probability Spinner Arcade",
+    name: "Ch.06 Global Trade & Diplomacy Hub",
     description:
-      "Giant dice & Bayes probability wheel modeling Binomial distributions, medical tests, and Monte Carlo runs.",
-    statusLine: "Inspect Ch.06 Probability & Bayes Lab",
+      "20th-century world history & multilateral diplomacy beacon illustrating post-1945 institutions and global interdependence.",
+    statusLine: "Inspect Ch.06 Contemporary World History Lab",
     preferredX: 10,
     preferredZ: 54,
     scaleClass: "medium",
-    accentColor: "red",
+    accentColor: "blue",
     secondaryColor: "cream",
     motif: "prob_spinner",
   },
   {
     chapterNum: "07",
     id: "math-ch-07",
-    name: "Ch.07 Trig Unit Circle Rotor",
+    name: "Ch.07 Globe Graticule & IST Rotor",
     description:
-      "Spinning unit circle phasor and cosine/sine wave arch for acoustics, Fourier analysis, and positional encoding.",
-    statusLine: "Inspect Ch.07 Trigonometry Lab",
+      "Spinning Latitude-Longitude globe ring calibrated to the 82.5°E Indian Standard Time meridian and heat zones.",
+    statusLine: "Inspect Ch.07 Latitudes, Longitudes & IST Lab",
     preferredX: -12,
     preferredZ: 54,
     scaleClass: "medium",
@@ -175,66 +175,66 @@ export const MATH_CHAPTER_MONUMENTS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "08",
     id: "math-ch-08",
-    name: "Ch.08 Inverse Trig Observatory",
+    name: "Ch.08 Plate Tectonics Fault Mirror",
     description:
-      "Principal-branch arcsin/arccos mirror pavilion calibrated for inverse kinematics and robot joint angles.",
-    statusLine: "Inspect Ch.08 Inverse Trig Functions Lab",
+      "Himalayan uplift & lithospheric plate boundary observatory tracking earthquakes, volcanoes & fold mountains.",
+    statusLine: "Inspect Ch.08 Plate Tectonics & Landforms Lab",
     preferredX: -32,
     preferredZ: 48,
     scaleClass: "medium",
-    accentColor: "indigo",
+    accentColor: "fire",
     secondaryColor: "cyan",
     motif: "inv_mirror",
   },
   {
     chapterNum: "09",
     id: "math-ch-09",
-    name: "Ch.09 Triangle Properties Sundial",
+    name: "Ch.09 Monsoon & Climate Sundial",
     description:
-      "Law of Sines & Cosines triangular prism monument with circumcircle beacon for land surveying & triangulation.",
-    statusLine: "Inspect Ch.09 Properties of Triangles Lab",
+      "Southwest & Northeast Monsoon wind observatory tracking ITCZ pressure belts, Coriolis deflection & rainfall seasons.",
+    statusLine: "Inspect Ch.09 Indian Monsoon & Climate Lab",
     preferredX: -48,
     preferredZ: 34,
     scaleClass: "medium",
-    accentColor: "yellow",
-    secondaryColor: "teal",
+    accentColor: "teal",
+    secondaryColor: "yellow",
     motif: "triangle_prism",
   },
   {
     chapterNum: "10",
     id: "math-ch-10",
-    name: "Ch.10 Straight Lines Vector Span",
+    name: "Ch.10 Himalayan & River Basin Bridge",
     description:
-      "Crossed slope-intercept beams and normal perpendicular bridge modeling linear classifiers and ray marching.",
-    statusLine: "Inspect Ch.10 Straight Lines Lab",
+      "Watershed span monument modeling perennial Ganga-Brahmaputra basins alongside Peninsular Godavari & Narmada rivers.",
+    statusLine: "Inspect Ch.10 River Systems & Drainage Lab",
     preferredX: -58,
     preferredZ: 14,
     scaleClass: "medium",
-    accentColor: "blue",
-    secondaryColor: "orange",
+    accentColor: "water",
+    secondaryColor: "leaf",
     motif: "line_bridge",
   },
   {
     chapterNum: "11",
     id: "math-ch-11",
-    name: "Ch.11 Circles & Radar Dish",
+    name: "Ch.11 Soil Strata & Crop Radar",
     description:
-      "Spinning Hough-transform radar tower illustrating tangents, normals, geofencing radii, and radical axes.",
-    statusLine: "Inspect Ch.11 Circles & Geofencing Lab",
+      "Agrarian radar beacon mapping Alluvial, Black Regur, Red & Laterite soil zones with Kharif & Rabi crop cycles.",
+    statusLine: "Inspect Ch.11 Soils, Agriculture & Crops Lab",
     preferredX: -58,
     preferredZ: -8,
     scaleClass: "medium",
     accentColor: "screenGreen",
-    secondaryColor: "slate",
+    secondaryColor: "soil",
     motif: "circle_radar",
   },
   {
     chapterNum: "12",
     id: "math-ch-12",
-    name: "Ch.12 Conic Sections Dish",
+    name: "Ch.12 Solar & Mineral Resource Dish",
     description:
-      "Parabolic reflector, elliptical orbital ring, and hyperbolic LORAN beacon for trajectory optimization.",
-    statusLine: "Inspect Ch.12 Conic Sections Lab",
+      "Clean energy solar collector & Chota Nagpur mineral belt pavilion balancing hydro, solar, wind & sustainable mining.",
+    statusLine: "Inspect Ch.12 Minerals & Renewable Energy Lab",
     preferredX: -48,
     preferredZ: -28,
     scaleClass: "medium",
@@ -245,52 +245,52 @@ export const MATH_CHAPTER_MONUMENTS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "13",
     id: "math-ch-13",
-    name: "Ch.13 Differential Calculus Arch",
+    name: "Ch.13 Constitution Preamble Arch",
     description:
-      "Curved gradient arch with sliding tangent pointer demonstrating limits, Sobel edge gradients, and backpropagation.",
-    statusLine: "Inspect Ch.13 Differential Calculus Lab",
+      "Granite Preamble arch celebrating Justice, Liberty, Equality, Fraternity and Articles 14–32 Fundamental Rights.",
+    statusLine: "Inspect Ch.13 Constitution & Rights Lab",
     preferredX: -32,
     preferredZ: -44,
     scaleClass: "medium",
-    accentColor: "magenta",
+    accentColor: "gold",
     secondaryColor: "cyan",
     motif: "diff_curve",
   },
   {
     chapterNum: "14",
     id: "math-ch-14",
-    name: "Ch.14 Integral Calculus Terraces",
+    name: "Ch.14 Sansad Hemicycle Terraces",
     description:
-      "Stepped Riemann sum area accumulator and ODE flow pillar for flood modeling, fluid dynamics, and diffusion models.",
-    statusLine: "Inspect Ch.14 Integral Calculus Lab",
+      "Stepped 543-seat Sansad Bhavan legislative dome simulating Lok Sabha, Rajya Sabha bills & constitutional majority.",
+    statusLine: "Inspect Ch.14 Parliament & Elections Lab",
     preferredX: -12,
     preferredZ: -52,
     scaleClass: "medium",
-    accentColor: "water",
+    accentColor: "brick",
     secondaryColor: "gold",
     motif: "int_riemann",
   },
   {
     chapterNum: "15",
     id: "math-ch-15",
-    name: "Ch.15 Vector Algebra Triad",
+    name: "Ch.15 Panchayati Raj 3-Tier Pillar",
     description:
-      "Orthogonal i-j-k basis tripod with orbiting cross-product normal modeling 3D game physics and attention dot products.",
-    statusLine: "Inspect Ch.15 Vector Algebra Lab",
+      "Three-tier federalism monument linking Gram Panchayat, Block Samiti & Zila Parishad local self-government.",
+    statusLine: "Inspect Ch.15 Federalism & Local Govt Lab",
     preferredX: 12,
     preferredZ: -52,
     scaleClass: "medium",
-    accentColor: "red",
-    secondaryColor: "lime",
+    accentColor: "lime",
+    secondaryColor: "orange",
     motif: "vector_tripod",
   },
   {
     chapterNum: "16",
     id: "math-ch-16",
-    name: "Ch.16 3D Geometry Spire",
+    name: "Ch.16 Supreme Court Justice Spire",
     description:
-      "Skew-lines shortest-distance crystal obelisk used for LiDAR point-cloud collision checks and robotics.",
-    statusLine: "Inspect Ch.16 3D Geometry Lab",
+      "Rule-of-law crystal spire demonstrating separation of Legislature, Executive & independent Judiciary review.",
+    statusLine: "Inspect Ch.16 Judiciary & Rule of Law Lab",
     preferredX: 32,
     preferredZ: -44,
     scaleClass: "medium",
@@ -301,24 +301,24 @@ export const MATH_CHAPTER_MONUMENTS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "17",
     id: "math-ch-17",
-    name: "Ch.17 Statistics Bell Curve",
+    name: "Ch.17 United Nations Diplomacy Arch",
     description:
-      "Gaussian normal distribution arch with oscillating Z-score beacon for manufacturing QC and ML feature scaling.",
-    statusLine: "Inspect Ch.17 Statistics & Z-Score Lab",
+      "Global peacekeeping & multilateral assembly monument highlighting UN Charter agencies, UNESCO heritage & treaties.",
+    statusLine: "Inspect Ch.17 United Nations & Diplomacy Lab",
     preferredX: 68,
     preferredZ: -30,
     scaleClass: "medium",
-    accentColor: "gold",
-    secondaryColor: "teal",
+    accentColor: "sky",
+    secondaryColor: "gold",
     motif: "bell_arch",
   },
   {
     chapterNum: "18",
     id: "math-ch-18",
-    name: "Ch.18 Mathematical Reasoning Gate",
+    name: "Ch.18 Demand & Supply Market Gate",
     description:
-      "Glowing AND/OR/NOT digital logic arch with oscillating truth-state core for symbolic reasoning & hardware circuits.",
-    statusLine: "Inspect Ch.18 Logic & Reasoning Lab",
+      "Microeconomics price-discovery gateway modeling Market Equilibrium, Consumer Surplus & bumper harvest supply shifts.",
+    statusLine: "Inspect Ch.18 Demand & Supply Markets Lab",
     preferredX: 70,
     preferredZ: 28,
     scaleClass: "medium",
@@ -329,10 +329,10 @@ export const MATH_CHAPTER_MONUMENTS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "19",
     id: "math-ch-19",
-    name: "Ch.19 Sets & Venn Observatory",
+    name: "Ch.19 Economy GDP Sectors Rings",
     description:
-      "Interlocking rotating Venn rings modeling SQL relational joins, database indexing, and classification boundaries.",
-    statusLine: "Inspect Ch.19 Sets, Relations & Functions",
+      "Interlocking Primary Agriculture, Secondary Industry & Tertiary Services rings tracking GDP growth and banking credit.",
+    statusLine: "Inspect Ch.19 Sectors of Indian Economy Lab",
     preferredX: -70,
     preferredZ: 28,
     scaleClass: "medium",
@@ -346,10 +346,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "HQ",
     id: "math-dev-hq",
-    name: "AARUTO + DIPU-_- Dev Arcade HQ",
+    name: "AARUTO + DIPU-_- SST-LAB Dev HQ",
     description:
-      "Creator landmark MADE BY \"AARUTO\" + \"DIPU-_-\"! Click or press E to launch sky-high voxel math fireworks.",
-    statusLine: "Launch AARUTO + DIPU-_- Fireworks Salvo",
+      "Creator landmark MADE BY \"AARUTO\" + \"DIPU-_-\"! Click or press E to launch sky-high SST-LAB festival fireworks.",
+    statusLine: "Launch AARUTO + DIPU-_- SST-LAB Fireworks",
     preferredX: 16,
     preferredZ: -20,
     scaleClass: "medium",
@@ -361,10 +361,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "FX",
     id: "math-toy-piano",
-    name: "Harmonic Sine Floor Piano",
+    name: "Sangeet Heritage Floor Piano",
     description:
-      "Ch.07 Trigonometry music mat curated by AARUTO + DIPU-_-. Walk across or click keys to play C4-C5 harmonic frequencies.",
-    statusLine: "Walk or Click Keys to Play Sine Piano",
+      "Cultural heritage raga scale mat curated by AARUTO + DIPU-_-. Walk across or click keys to play Sa-Re-Ga-Ma-Pa notes.",
+    statusLine: "Walk or Click Keys to Play Heritage Piano",
     preferredX: -14,
     preferredZ: 34,
     scaleClass: "medium",
@@ -376,10 +376,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "FX",
     id: "math-toy-sequencer",
-    name: "Fourier Beat Matrix Sequencer",
+    name: "Folk Rhythm Step Sequencer",
     description:
-      "Interactive 8x4 rhythm & harmonic series synth matrix built by AARUTO + DIPU-_-. Toggle pads to compose live chiptune beats.",
-    statusLine: "Toggle Pads on Fourier Step Sequencer",
+      "Interactive 8x4 folk percussion & trade-beat matrix built by AARUTO + DIPU-_-. Toggle pads to compose live rhythms.",
+    statusLine: "Toggle Pads on Folk Rhythm Sequencer",
     preferredX: 22,
     preferredZ: 34,
     scaleClass: "medium",
@@ -391,10 +391,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "FX",
     id: "math-toy-lights",
-    name: "Boolean Lights-Out Logic Matrix",
+    name: "Civic Signal Lights-Out Grid",
     description:
-      "Ch.18 Mathematical Reasoning puzzle shrine. Ignite all 9 glowing logic cubes using XOR neighborhood toggles.",
-    statusLine: "Solve Boolean 3x3 Lights-Out Matrix",
+      "Ch.15 Local Governance city power puzzle grid. Light up every district block across the 3x3 town plaza.",
+    statusLine: "Light All 9 District Civic Blocks",
     preferredX: 40,
     preferredZ: 18,
     scaleClass: "medium",
@@ -406,10 +406,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "FX",
     id: "math-toy-simon",
-    name: "Permutation Simon Memory Synth",
+    name: "Dynasty Era Memory Synth",
     description:
-      "Ch.03 Permutations 4-pad synth challenge designed by AARUTO + DIPU-_-. Repeat escalating musical sequences.",
-    statusLine: "Play Permutation Simon Memory Synth",
+      "Chronological era-sequence challenge designed by AARUTO + DIPU-_-. Repeat escalating historical chime patterns.",
+    statusLine: "Play Dynasty Era Memory Synth",
     preferredX: 38,
     preferredZ: -12,
     scaleClass: "medium",
@@ -421,10 +421,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "FX",
     id: "math-toy-marble",
-    name: "Fibonacci Helical Marble Cascade",
+    name: "Silk Route Trade Cascade Tower",
     description:
-      "Kinetic calculus helix tower where musical glowing voxel marbles spiral down along a golden-ratio path.",
-    statusLine: "Drop Marbles Down Fibonacci Helix",
+      "Spiral trade-caravan tower where glowing spice & silk beads cascade along ancient transcontinental routes.",
+    statusLine: "Send Trade Goods Down Silk Route Helix",
     preferredX: -24,
     preferredZ: -32,
     scaleClass: "medium",
@@ -436,10 +436,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "FX",
     id: "math-toy-tesla",
-    name: "Complex Impedance Tesla Coil",
+    name: "Hydro-Electric Power Grid Coil",
     description:
-      "Ch.01 AC Phasor & Nikola Tesla coil tower. Trigger 500,000V glowing harmonic lightning arcs across MATH_LAND.",
-    statusLine: "Trigger Complex Impedance Tesla Arc",
+      "Ch.12 Clean Energy & Electrification tower powering SST-LAB with glowing high-voltage hydro lightning arcs.",
+    statusLine: "Trigger Clean Energy Hydro-Grid Arc",
     preferredX: 46,
     preferredZ: -38,
     scaleClass: "medium",
@@ -451,10 +451,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "FX",
     id: "math-toy-gravity",
-    name: "Vector Eigen Gravity Inverter",
+    name: "Magnetic Pole Reversal Cube",
     description:
-      "Ch.15 Vector transformation monument. Click to invert gravity and flip this glowing voxel cube 180 degrees.",
-    statusLine: "Flip Vector Gravity Inverter Cube",
+      "Ch.08 Earth Interior & Geomagnetic monument. Click to flip polarity and invert this levitating voxel core.",
+    statusLine: "Flip Geomagnetic Pole Inverter Cube",
     preferredX: -38,
     preferredZ: 12,
     scaleClass: "medium",
@@ -466,10 +466,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "FX",
     id: "math-toy-hoop",
-    name: "Parabolic Conic Trick-Shot Hoop",
+    name: "Heritage Courtyard Hoop Court",
     description:
-      "Ch.12 Projectile parabola court created by AARUTO + DIPU-_-. Shoot 2pt and 3pt quadratic trajectories from the court pads.",
-    statusLine: "Shoot Parabolic Trick-Shots on Court",
+      "SST-LAB Olympic & School Courtyard created by AARUTO + DIPU-_-. Shoot 2pt and 3pt arcs from the court pads.",
+    statusLine: "Shoot Courtyard Trick-Shots on Court",
     preferredX: -36,
     preferredZ: -14,
     scaleClass: "medium",
@@ -481,10 +481,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "20",
     id: "math-ch-20",
-    name: "Ch.20 Graphing Studio Tower",
+    name: "Ch.20 World Atlas & Trade Studio",
     description:
-      "Interactive Cartesian & Polar 3D function plotter spire with glowing tangent prism and Riemann accumulator!",
-    statusLine: "Inspect Ch.20 Graphing Studio Lab",
+      "Interactive Global Geography & International Trade plotter spire with meridian beacon and maritime shipping lanes!",
+    statusLine: "Inspect Ch.20 World Atlas & Trade Studio",
     preferredX: 28,
     preferredZ: -44,
     scaleClass: "medium",
@@ -495,9 +495,9 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "HSE",
     id: "math-house-clubhouse",
-    name: "MATH_LAND Cozy House",
+    name: "SST-LAB Cozy House",
     description:
-      "Enterable manor house by AARUTO + DIPU-_-! Walk inside [E] for the Quest Book, Live 4-Channel TV, Copper Tea Kettle & Fireplace.",
+      "Enterable manor house by AARUTO + DIPU-_-! Walk inside [E] for the SST-LAB Quest Book, Live 4-Channel Atlas TV, Tea Kettle & Fireplace.",
     statusLine: "Enter Cozy House · Press E for Quest Book & TV",
     preferredX: -14.5,
     preferredZ: -16.5,
@@ -509,7 +509,7 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
     behavior: {
       type: "landmark",
       facingYaw: 0,
-      activity: "Cozy Manor · Quest Book, Live TV & Tea Inside",
+      activity: "Cozy Manor · SST Quest Book, Atlas TV & Tea Inside",
       statusLine: "Walk to door & press E to enter Quest Book, TV & Fireplace!",
     },
   },
@@ -518,7 +518,7 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
     id: "math-turbo-roadster",
     name: "Pixel Turbo Roadster Car",
     description:
-      "Drivable crimson & gold voxel sports roadster built for MATH_LAND by AARUTO + DIPU-_-. Press E or click CAR to steer with WASD, Shift Turbo & H Horn!",
+      "Drivable crimson & gold voxel roadster built for SST-LAB by AARUTO + DIPU-_-. Press E or click CAR to steer with WASD, Shift Turbo & H Horn!",
     statusLine: "Ready to Drive · Press E or Click CAR",
     preferredX: 11.5,
     preferredZ: -10.5,
@@ -531,7 +531,7 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
       type: "landmark",
       facingYaw: 0.35,
       activity: "Parked · Ready to Drive!",
-      statusLine: "Press E or click CAR to drive around MATH_LAND!",
+      statusLine: "Press E or click CAR to cruise SST-LAB roads!",
     },
   },
   {
@@ -539,8 +539,8 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
     id: "math-rally-coupe",
     name: "Cobalt Rally Coupe Car",
     description:
-      "Drivable azure & cream rally coupe parked near MATH_LAND Cozy House. Press E to hop in and drift the ring road!",
-    statusLine: "Ready to Drive · Cobalt Rally Coupe",
+      "Drivable azure & cream expedition coupe parked near SST-LAB Cozy House. Press E to explore landforms and districts!",
+    statusLine: "Ready to Drive · Cobalt Expedition Coupe",
     preferredX: -11.5,
     preferredZ: -25.5,
     scaleClass: "medium",
@@ -558,10 +558,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "CAR",
     id: "math-dune-buggy",
-    name: "Solar Dune Buggy Car",
+    name: "Thar Desert Dune Buggy",
     description:
-      "Drivable sunburst yellow & orange voxel buggy with roll-cage & off-road wheels. Press E to cruise MATH_LAND!",
-    statusLine: "Ready to Drive · Solar Dune Buggy",
+      "Drivable sunburst desert expedition buggy with roll-cage & off-road wheels. Press E to survey SST-LAB terrain!",
+    statusLine: "Ready to Drive · Desert Expedition Buggy",
     preferredX: 26.5,
     preferredZ: 24.5,
     scaleClass: "medium",
@@ -573,16 +573,16 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
       type: "landmark",
       facingYaw: -0.78,
       activity: "Parked by South Promenade · Ready to Drive!",
-      statusLine: "Press E to drive the Solar Dune Buggy!",
+      statusLine: "Press E to drive the Desert Dune Buggy!",
     },
   },
   {
     chapterNum: "TRN",
     id: "math-express-train",
-    name: "MATH_LAND Express Train",
+    name: "SST-LAB Express Train",
     description:
-      "Steam locomotive & emerald coach gliding along MATH_LAND's scenic circular railway tracks. Hop aboard [E] or click RIDE TRAIN!",
-    statusLine: "Scenic Rail Express · Press E to Board",
+      "Heritage steam locomotive & coach gliding along SST-LAB's scenic circular railway tracks. Hop aboard [E] or click RIDE TRAIN!",
+    statusLine: "Heritage Rail Express · Press E to Board",
     preferredX: 0,
     preferredZ: -64,
     scaleClass: "large",
@@ -606,20 +606,20 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
         [-44, -54],
       ],
       stops: [
-        { id: "stop-ml-central", name: "Central Train Station", x: 0, z: -64, dwellSec: 2.2 },
-        { id: "stop-ml-east", name: "Arcade East Junction", x: 62, z: -16, dwellSec: 1.8 },
-        { id: "stop-ml-south", name: "South Harbor Station", x: 0, z: 64, dwellSec: 1.8 },
+        { id: "stop-sst-central", name: "Central Railway Junction", x: 0, z: -64, dwellSec: 2.2 },
+        { id: "stop-sst-east", name: "Heritage East Junction", x: 62, z: -16, dwellSec: 1.8 },
+        { id: "stop-sst-south", name: "South Harbor Station", x: 0, z: 64, dwellSec: 1.8 },
       ],
-      statusLine: "Steam Express touring the MATH_LAND scenic railway!",
+      statusLine: "Heritage Express touring the SST-LAB scenic railway!",
     },
   },
   {
     chapterNum: "STN",
     id: "math-train-station",
-    name: "Central Express Train Station",
+    name: "SST-LAB Central Railway Junction",
     description:
-      "Covered brick-and-brass railway station built by AARUTO + DIPU-_- along the MATH_LAND Express loop.",
-    statusLine: "Central Train Station · Catch the Express!",
+      "Covered brick-and-brass railway junction built by AARUTO + DIPU-_- along the SST-LAB Express loop.",
+    statusLine: "Central Railway Junction · Catch the Express!",
     preferredX: 0,
     preferredZ: -74,
     scaleClass: "medium",
@@ -630,10 +630,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "BAS",
     id: "math-park-abacus",
-    name: "Basic Park Giant Abacus",
+    name: "Basic SST Cardinal Compass Plaza",
     description:
-      "Class 1-5 Basic Math Park 3D Abacus frame with colorful sliding place-value beads (1s, 10s, 100s). Click to count beads!",
-    statusLine: "Basic Math Park · Click Abacus Beads to Count!",
+      "Class 1–5 Basic SST Park giant trade & counting frame / compass dial. Click to cycle cardinal bearings & tally counts!",
+    statusLine: "Basic SST Park · Click to Cycle Cardinal Bearings!",
     preferredX: -34,
     preferredZ: 32,
     scaleClass: "medium",
@@ -645,10 +645,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "BAS",
     id: "math-park-fraction",
-    name: "Fraction Pizza Market Stand",
+    name: "India States & Landforms Kiosk",
     description:
-      "Class 1-6 Fractions & Decimals kiosk by AARUTO + DIPU-_-. Click to slice the giant glowing pizza into halves, quarters & eighths!",
-    statusLine: "Basic Math Park · Click Stand to Slice Fractions!",
+      "Class 3–6 Map Symbols & Landforms Market Stand by AARUTO + DIPU-_-. Click to cycle India's physiographic zones!",
+    statusLine: "Basic SST Park · Click to Explore India Landforms!",
     preferredX: -46,
     preferredZ: 22,
     scaleClass: "medium",
@@ -660,10 +660,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "BAS",
     id: "math-park-scale",
-    name: "Algebra Balance Scale Plaza",
+    name: "Barter & Rupee Trade Scale Plaza",
     description:
-      "Class 6-8 Linear Equations Balance Scale monument. Click to test ax + b = c weights and watch the golden beam tip!",
-    statusLine: "Basic Math Park · Click Scale to Balance Equations!",
+      "Class 3–8 Historical Barter-to-Rupee Fair Trade Scale monument. Click to test grain, silver & rupee trade balance!",
+    statusLine: "Basic SST Park · Click Scale to Balance Barter Trade!",
     preferredX: -22,
     preferredZ: 42,
     scaleClass: "medium",
@@ -675,10 +675,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "EXP",
     id: "math-exp-pendulum",
-    name: "Galileo Pendulum Clock Tower",
+    name: "Richter Seismograph Pendulum Tower",
     description:
-      "Experiment Yard physics tower demonstrating SHM period T = 2π√(L/g) and trigonometric oscillation!",
-    statusLine: "Experiment Yard · Click Pendulum to Boost Swing!",
+      "Field Experiment Yard seismic station measuring P-waves, S-waves & tectonic earthquake tremors!",
+    statusLine: "Field Experiment Yard · Click Seismograph to Test Quake!",
     preferredX: 36,
     preferredZ: 20,
     scaleClass: "medium",
@@ -690,10 +690,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "EXP",
     id: "math-exp-rocket",
-    name: "Kinematics Rocket Launch Pad",
+    name: "INSAT Weather Satellite Launch Pad",
     description:
-      "CBSE Projectile & Calculus Launch Pad. Click or press E to ignite the voxel rocket stage and trace thrust!",
-    statusLine: "Experiment Yard · Click Pad to Ignite Rocket!",
+      "CBSE Geography & Monsoon satellite launch pad. Click or press E to launch a voxel weather sonde!",
+    statusLine: "Field Experiment Yard · Click Pad to Launch Weather Sonde!",
     preferredX: 48,
     preferredZ: 10,
     scaleClass: "medium",
@@ -705,10 +705,10 @@ export const MATH_INTERACTIVE_ATTRACTIONS: readonly MathMonumentSpec[] = [
   {
     chapterNum: "EXP",
     id: "math-exp-wheel",
-    name: "Sine Wave Ferris Wheel",
+    name: "Civic Heritage Observation Wheel",
     description:
-      "Rotating Experiment Yard Ferris Wheel demonstrating periodic height y(t) = R·sin(ωt) + h across colorful cabins!",
-    statusLine: "Experiment Yard · Click Wheel to Shift Speed!",
+      "Rotating Field Experiment Yard observation wheel surveying SST-LAB's biomes, rivers & historical monuments!",
+    statusLine: "Field Experiment Yard · Click Wheel to Shift Speed!",
     preferredX: 42,
     preferredZ: -4,
     scaleClass: "large",
@@ -1521,7 +1521,7 @@ export function ensureMathCampusCreations(
 ): boolean {
   let added = false;
   const baseTs = Date.now() - 86_400_000;
-  const existingIds = new Set(creations.map((c) => c.id));
+  const byId = new Map(creations.map((c) => [c.id, c]));
 
   const allSpecs: readonly MathMonumentSpec[] = [
     ...MATH_CHAPTER_MONUMENTS,
@@ -1530,7 +1530,35 @@ export function ensureMathCampusCreations(
 
   for (let i = 0; i < allSpecs.length; i++) {
     const spec = allSpecs[i];
-    if (existingIds.has(spec.id)) continue;
+    const nextPrompt =
+      spec.chapterNum === "HQ" ||
+      spec.chapterNum === "HSE" ||
+      spec.chapterNum === "FX" ||
+      spec.chapterNum === "CAR" ||
+      spec.chapterNum === "TRN" ||
+      spec.chapterNum === "STN"
+        ? `SST-LAB Interactive Attraction by AARUTO + DIPU-_-: ${spec.name}`
+        : `SST-LAB Chapter ${spec.chapterNum}: ${spec.name}`;
+
+    const existing = byId.get(spec.id);
+    if (existing) {
+      if (existing.name !== spec.name || existing.description !== spec.description) {
+        existing.name = spec.name;
+        existing.description = spec.description;
+        existing.creatorPrompt = nextPrompt;
+        if (existing.blueprint) {
+          existing.blueprint.name = spec.name;
+          existing.blueprint.description = spec.description;
+        }
+        if (spec.behavior) {
+          existing.behavior = { ...spec.behavior };
+        } else if (existing.behavior?.type === "landmark") {
+          existing.behavior.statusLine = spec.statusLine;
+        }
+        added = true;
+      }
+      continue;
+    }
 
     const blueprint = buildMotifBlueprint(spec);
     const newR = getCreationFootprintRadius(
@@ -1553,15 +1581,7 @@ export function ensureMathCampusCreations(
       id: spec.id,
       name: spec.name,
       description: spec.description,
-      creatorPrompt:
-        spec.chapterNum === "HQ" ||
-        spec.chapterNum === "HSE" ||
-        spec.chapterNum === "FX" ||
-        spec.chapterNum === "CAR" ||
-        spec.chapterNum === "TRN" ||
-        spec.chapterNum === "STN"
-          ? `MATH_LAND Interactive Attraction by AARUTO + DIPU-_-: ${spec.name}`
-          : `MATH_LAND Chapter ${spec.chapterNum}: ${spec.name}`,
+      creatorPrompt: nextPrompt,
       category: spec.category ?? "prop",
       scaleClass: spec.scaleClass,
       x: Number(px.toFixed(2)),
@@ -1575,10 +1595,10 @@ export function ensureMathCampusCreations(
             facingYaw: 0,
             activity:
               spec.chapterNum === "HQ"
-                ? "AARUTO + DIPU-_- Dev Arcade HQ"
+                ? "AARUTO + DIPU-_- SST-LAB Dev HQ"
                 : spec.chapterNum === "FX"
                   ? `Playing ${spec.name}`
-                  : `Exploring Chapter ${spec.chapterNum}`,
+                  : `Exploring SST Chapter ${spec.chapterNum}`,
             statusLine: spec.statusLine,
           },
       liveFeed: null,
@@ -1597,7 +1617,7 @@ export function ensureMathCampusCreations(
     }
 
     creations.push(creation);
-    existingIds.add(spec.id);
+    byId.set(spec.id, creation);
     added = true;
   }
 

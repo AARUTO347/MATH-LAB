@@ -419,7 +419,7 @@ function createContributorSignboard(maxAniso = 4) {
     ctx.font = "800 30px -apple-system, BlinkMacSystemFont, 'Inter', sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("MATH_LAND", 256, 66);
+    ctx.fillText("SST-LAB", 256, 66);
 
     ctx.fillStyle = "#18211b";
     ctx.font = "800 104px -apple-system, BlinkMacSystemFont, 'Inter', sans-serif";
@@ -617,6 +617,19 @@ const SKY_BANNER_GLYPHS = {
     "##....##",
     "##....##",
   ],
+  B: [
+    "######.",
+    "#######",
+    "##...##",
+    "##...##",
+    "######.",
+    "######.",
+    "##...##",
+    "##...##",
+    "##...##",
+    "#######",
+    "######.",
+  ],
   _: [
     "......",
     "......",
@@ -634,7 +647,7 @@ const SKY_BANNER_GLYPHS = {
 
 function createFloatingSkyBanner() {
   const group = new THREE.Group();
-  const text = "MATH_LAND";
+  const text = "SST_LAB";
   const voxScale = 0.56;
   const letterGapCols = 2.1;
 
@@ -4085,8 +4098,8 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       z: CITY_SIGN_POS[1],
       data: {
         id: "__city_sign__",
-        name: "MATH_LAND Sign",
-        description: `Timber town signboard displaying ${n} ${n === 1 ? "contribution" : "contributions"} (${total} total builds in MATH_LAND).`,
+        name: "SST-LAB Sign",
+        description: `Timber town signboard displaying ${n} ${n === 1 ? "contribution" : "contributions"} (${total} total builds in SST-LAB).`,
         behavior: {
           statusLine: `${n} ${n === 1 ? "contribution" : "contributions"} · ${total} creations`,
         },
@@ -5614,7 +5627,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         target = {
           kind: "board_vehicle",
           id: trainEnt.id,
-          label: "Board MATH_LAND Express Train",
+          label: "Board SST-LAB Express Train",
           keyHint: "E",
           execute: () => boardVehicleById(trainEnt.id),
         };
@@ -5635,7 +5648,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
         target = {
           kind: "math_chapter",
           id: bestMathEnt.id,
-          label: `Open ${bestMathEnt.data?.name || "Math Lab"}`,
+          label: `Open ${bestMathEnt.data?.name || "SST Lab"}`,
           keyHint: "E",
           execute: () => ({ ok: true, creation: bestMathEnt.data }),
         };
@@ -6056,7 +6069,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
 
     callbacks.onDragModeChange?.("walk");
     if (baseId === "math-express-train") {
-      callbacks.onRideTrainChange?.({ riding: true, rideId, name: "MATH_LAND Express Train" });
+      callbacks.onRideTrainChange?.({ riding: true, rideId, name: "SST-LAB Express Train" });
     }
     refreshInteractionTarget();
     requestWalkPointerLock();
@@ -6091,7 +6104,7 @@ export function createMeadowWorldEngine(canvas, callbacks = {}, options = {}) {
       fpCamera.updateMatrixWorld();
     }
     if (prevRide.startsWith("math-express-train")) {
-      callbacks.onRideTrainChange?.({ riding: false, rideId: prevRide, name: "MATH_LAND Express Train" });
+      callbacks.onRideTrainChange?.({ riding: false, rideId: prevRide, name: "SST-LAB Express Train" });
     }
     refreshInteractionTarget();
     return true;

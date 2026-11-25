@@ -163,10 +163,10 @@ function hasTeslaTechCompanyReference(text: string): boolean {
   return /\btesla\b/i.test(stripped);
 }
 
-/**
- * Deterministic, zero-latency policy check against all GeminIsland content & stewardship rules.
- */
-export function checkIslandContentPolicy(rawText: string | null | undefined): ContentPolicyCheckResult {
+export function checkIslandContentPolicy(
+  rawText: string | null | undefined,
+  opts?: { educationalMode?: boolean },
+): ContentPolicyCheckResult {
   const text = (rawText ?? "").trim();
   if (!text) return { allowed: true };
 
@@ -175,11 +175,14 @@ export function checkIslandContentPolicy(rawText: string | null | undefined): Co
       allowed: false,
       category: "specific_tech_company",
       reason:
-        "Let's keep GeminIsland brand-free — builds referencing specific real-world technology companies, tech brands, or tech executives aren't permitted. Try an original fictional vehicle or workshop instead!",
+        "Let's keep SST-LAB brand-free — builds referencing specific real-world technology companies, tech brands, or tech executives aren't permitted. Try an original fictional vehicle or workshop instead!",
     };
   }
 
   for (const group of POLICY_GROUPS) {
+    if (opts?.educationalMode && group.category === "political_or_patriotic") {
+      continue;
+    }
     for (const re of group.patterns) {
       if (re.test(text)) {
         return {
@@ -195,12 +198,20 @@ export function checkIslandContentPolicy(rawText: string | null | undefined): Co
 }
 
 /**
- * Checks whether an existing or incoming WorldCreation is allowed on GeminIsland.
+ * Checks whether an existing or incoming WorldCreation is allowed on the island.
  */
 export function isCreationAllowedOnIsland(c: Partial<WorldCreation> | null | undefined): boolean {
   if (!c || typeof c.id !== "string") return false;
   if (DISALLOWED_CREATION_IDS.has(c.id)) return false;
   if (c.companionOfId && DISALLOWED_CREATION_IDS.has(c.companionOfId)) return false;
+
+  const isSstCampusLandmark =
+    Boolean(c.isSeed) &&
+    (c.id.startsWith("math-ch-") ||
+      c.id.startsWith("math-park-") ||
+      c.id.startsWith("math-exp-") ||
+      c.id.startsWith("math-toy-") ||
+      c.id.startsWith("math-"));
 
   const combined = [
     c.name ?? "",
@@ -211,7 +222,7 @@ export function isCreationAllowedOnIsland(c: Partial<WorldCreation> | null | und
     c.blueprint?.description ?? "",
   ].join(" \n ");
 
-  return checkIslandContentPolicy(combined).allowed;
+  return checkIslandContentPolicy(combined, { educationalMode: isSstCampusLandmark }).allowed;
 }
 
 /**
